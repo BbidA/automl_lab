@@ -7,11 +7,11 @@ def get_logger(logger_name, log_file_name, level=logging.INFO):
 
     # setup file handler
     file_handler = logging.FileHandler(log_file_name)
-    file_handler.setLevel(logging.INFO)
+    file_handler.setLevel(level)
 
     # setup console handler
     console_handler = logging.StreamHandler()
-    console_handler.setLevel(logging.INFO)
+    console_handler.setLevel(level)
 
     # setup format of logging
     formatter = logging.Formatter('%(levelname)s - %(message)s')

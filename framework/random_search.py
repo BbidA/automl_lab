@@ -12,7 +12,7 @@ from utils.logging_ import get_logger
 # define a logger
 
 
-log = get_logger('random_search', 'random_search.log')
+log = get_logger('random_search', 'random_search.log', level=logging.INFO)
 
 
 def timeout_handler(signum, frame):
@@ -33,7 +33,7 @@ def random_search(model_generator, train_x, train_y, search_times=100):
     for i in range(search_times):
         # sample a set of parameters and evaluate
         raw_params, actual_params = random_sample_parameters(model_generator.hp_space)
-        log.info('[{}]: parameters: {}'.format(model_name, actual_params))
+        log.debug('[{}]: parameters: {}'.format(model_name, actual_params))
         try:
             start = time.time()
             signal.alarm(90)
@@ -43,7 +43,7 @@ def random_search(model_generator, train_x, train_y, search_times=100):
             signal.alarm(0)
             elapsed = time.time() - start
 
-            log.info('accuracy: {}, spend {}s'.format(float(accuracy), elapsed))
+            log.debug('accuracy: {}, spend {}s'.format(float(accuracy), elapsed))
 
             # add parameters and accuracy information to four lists
             raw_parameter_list.append(raw_params)

@@ -40,6 +40,11 @@ class RandomOptimization:
     def best_evaluation(self):
         return self.instances.sort_values(by=EVALUATION_CRITERIA, ascending=False).iloc[0]
 
+    @property
+    def best_model(self):
+        best_params = self.best_evaluation['Raw Parameters']
+        return self.model_generator.generate_model(best_params)
+
     def run_one_step(self, train_x, train_y, beta=0):
         evaluation_result = random_search(self.model_generator, train_x, train_y, search_times=1)
 
@@ -138,20 +143,21 @@ class ModelSelection:
 class BanditModelSelection(ModelSelection):
     _update_functions = ['new', 'ucb', 'random', 'eg']
 
-    def __init__(self, optimizations, update_func='new', theta=1, factor=1):
+    def __init__(self, optimizations, update_func='new', theta=1, gamma=1, beta=0):
         super().__init__(optimizations)
         self.param_change_info = []
         self.theta = theta
-        self.factor = factor
+        self.gamma = gamma
         self.update_func = update_func
+        self.beta = beta
 
-    def fit(self, train_x, train_y, budget=200, beta=0):
+    def fit(self, train_x, train_y, budget=200):
         self._clean()  # clean history data
-        self._init_each_optimizations(train_x, train_y, beta)
+        self._init_each_optimizations(train_x, train_y, beta=self.beta)
 
         for t in range(len(self.optimizations) + 1, budget + 1):
             next_model = self._next_selection(t)
-            next_model.run_one_step(train_x, train_y, beta=beta)
+            next_model.run_one_step(train_x, train_y, beta=self.beta)
 
         return self._best_selection()
 
@@ -175,7 +181,7 @@ class BanditModelSelection(ModelSelection):
     def _next_selection(self, current_count):
         selection_record = []  # used to record values of the terms of the equation for each models
         if self.update_func == 'new':
-            values = [_new_func(o, current_count, theta=self.theta, record=selection_record, gamma=self.factor)
+            values = [_new_func(o, current_count, theta=self.theta, record=selection_record, gamma=self.gamma)
                       for o in self.optimizations]
         elif self.update_func == 'ucb':
             values = [_ucb_func(o, current_count, selection_record) for o in self.optimizations]
