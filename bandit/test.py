@@ -10,7 +10,7 @@ import multiprocessing as mp
 import pandas as pd
 import pickle
 
-BUDGET = 1000
+BUDGET = 2
 GROUND_TRUTH_PKL = 'log/ground_truth.pkl'
 
 logger = get_logger('lab', 'bandit_test.log')
@@ -31,7 +31,7 @@ model_generators = [
 ]
 
 
-def find_ground_truth(data, model_generator, budget=2):
+def find_ground_truth(data, model_generator, budget=BUDGET):
     """Find the ground truth model for each dataset
 
     Parameters
@@ -64,7 +64,11 @@ def ground_truth_lab():
     cores = mp.cpu_count()
     statistics = []
     ground_truth_model = {}
-    for data in data_loader.all_data()[0:1]:
+    for data in data_loader.all_data():
+        # adult cost too much time so we ignore it
+        if data.name == 'adult':
+            continue
+
         start = time.time()
         with mp.Pool(processes=cores) as pool:
             result = pool.starmap(find_ground_truth, [(data, generator) for generator in model_generators])
@@ -78,7 +82,7 @@ def ground_truth_lab():
 
             # save to csv
             with open('log/gt_{}.csv'.format(data.name), 'a') as f:
-                f.write('best is {}'.format(best_model))
+                f.write('best is {}\n'.format(best_model))
                 data_frame.to_csv(f, mode='a')
 
         elapsed = time.time() - start
@@ -123,6 +127,12 @@ def ucb_lab(data):
     best_v = best_optimization.best_evaluation['Accuracy'][0]
     best_model = best_optimization.name
     test_v = _evaluate_test_v(data, best_optimization.best_model)
+
+    return best_v, best_model, test_v
+
+
+def proposed_lab():
+    pass
 
 
 def bandit_test():
