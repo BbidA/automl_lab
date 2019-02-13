@@ -133,6 +133,11 @@ class ModelSelection:
     def fit(self, train_x, train_y):
         return
 
+    def statistics(self):
+        data = [(o.name, o.mu, o.sigma, o.count, o.best_evaluation[EVALUATION_CRITERIA])
+                for o in self.optimizations]
+        return pd.DataFrame(data=data, columns=['name', 'mu', 'sigma', 'budget', 'best v'])
+
     def _best_selection(self):
         best_results = [r.best_evaluation[EVALUATION_CRITERIA] for r in self.optimizations]
         best_index = np.argmax(best_results)
@@ -141,7 +146,7 @@ class ModelSelection:
 
 
 class BanditModelSelection(ModelSelection):
-    _update_functions = ['new', 'ucb', 'random', 'eg']
+    _update_functions = ['new', 'ucb', 'random']
 
     def __init__(self, optimizations, update_func='new', theta=1, gamma=1, beta=0):
         super().__init__(optimizations)
@@ -186,10 +191,9 @@ class BanditModelSelection(ModelSelection):
             data = [(o.name, o.mu, o.sigma, o.square_mean, o.count, o.best_evaluation[EVALUATION_CRITERIA])
                     for o in self.optimizations]
             return pd.DataFrame(data=data, columns=['name', 'mu(-beta)', 'sigma', 'mu_Y', 'budget', 'best v'])
-        elif self.update_func == 'ucb':
-            data = [(o.name, o.mu, o.sigma, o.count, o.best_evaluation[EVALUATION_CRITERIA])
-                    for o in self.optimizations]
-            return pd.DataFrame(data=data, columns=['name', 'mu', 'sigma', 'budget', 'best v'])
+        else:
+            # random or ucb method
+            return super().statistics()
 
     def _wrap_selection_information(self, data):
         if self.update_func is _new_func:
@@ -265,3 +269,5 @@ class SoftMaxSelection(ModelSelection):
                 return self.optimizations[i - 1]
 
         assert False
+
+

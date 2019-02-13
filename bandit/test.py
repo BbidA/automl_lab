@@ -9,8 +9,9 @@ import sys
 import multiprocessing as mp
 import pandas as pd
 import pickle
+from logging import INFO, DEBUG
 
-BUDGET = 2
+BUDGET = 1000
 GROUND_TRUTH_PKL = 'log/ground_truth.pkl'
 
 logger = get_logger('lab', 'bandit_test.log')
@@ -92,7 +93,17 @@ def ground_truth_lab():
         pickle.dump(ground_truth_model, f)
 
 
-def ucb_lab(data):
+def ucb_lab():
+    cores = mp.cpu_count()
+    all_data = data_loader.all_data()
+    with mp.Pool(processes=cores) as pool:
+        result = pool.map(ucb_method, all_data)
+        df_result = pd.DataFrame(data=result, columns=['data set', 'best_v', 'best_model', 'test_v'])
+        df_result.to_csv('log/ucb_lab.csv')
+        df_result.to_pickle('log/ucb_lab.pkl')
+
+
+def ucb_method(data):
     """Do model selection by traditional ucb method
 
     Parameters
@@ -102,37 +113,69 @@ def ucb_lab(data):
         training data
 
     """
-    import logging
-    log = get_logger('ucb', 'ucb.log', level=logging.DEBUG)
+    log = get_logger('ucb', 'ucb.log', level=DEBUG)
 
     optimizations = _get_optimizations()
     model_selection = BanditModelSelection(optimizations, 'ucb')
 
+    log.info('Begin fit on {}'.format(data.name))
     train_x, train_y = data.train_data()
 
-    log.info('Begin fit on {}'.format(data.name))
     start = time.time()
 
-    best_optimization = model_selection.fit(train_x, train_y, budget=1000)
+    best_optimization = model_selection.fit(train_x, train_y, budget=BUDGET)
+
+    log.info('Fitting no {} is done! Spend {}s'.format(data.name, time.time() - start))
+
+    csv_file = 'log/ucb/ucb_{}.csv'.format(data.name)
+    pkl_file = 'log/ucb/ucb_{}.pkl'.format(data.name)
+    return _get_test_result(best_optimization, data, model_selection, csv_file, pkl_file, log)
+
+
+def proposed_lab(data):
+    """Do model selection with proposed method
+
+    Parameters
+    ----------
+    data: utils.data_loader.DataSet
+        training data
+    """
+    log = get_logger('proposed', 'proposed.log', level=DEBUG)
+
+    # get commandline parameters
+    theta = float(sys.argv[2])
+    gamma = float(sys.argv[3])
+    beta = float(sys.argv[4])
+
+    optimizations = _get_optimizations()
+    model_selection = BanditModelSelection(optimizations, 'new', theta=theta, gamma=gamma, beta=beta)
+
+    log.info('Begin fit on {}'.format(data.name))
+    train_x, train_y = data.train_data()
+
+    start = time.time()
+    best_optimization = model_selection.fit(train_x, train_y, budget=BUDGET)
 
     log.info('Done! Spend {}s'.format(time.time() - start))
 
-    # save statistics to csv
-    statistics = model_selection.statistics()
-    statistics.to_csv('ucb_log/ucb_{}.csv'.format(data.name))
-    # save to pickle file for calculating exploitation rate
-    statistics.to_pickle('ucb_log/ucb_{}.pkl'.format(data.name))
+    csv_file = 'log/proposed/proposed_{}_{}_{}.csv'.format(theta, gamma, beta)
+    pkl_file = 'log/proposed/proposed_{}_{}_{}.pkl'.format(theta, gamma, beta)
 
-    # record best_v, best_model, budget
-    best_v = best_optimization.best_evaluation['Accuracy'][0]
-    best_model = best_optimization.name
-    test_v = _evaluate_test_v(data, best_optimization.best_model)
-
-    return best_v, best_model, test_v
+    return _get_test_result(best_optimization, data, model_selection, csv_file, pkl_file, log)
 
 
-def proposed_lab():
-    pass
+def eg_lab(data):
+    """Do model selection with epsilon-greedy method
+
+    Parameters
+    ----------
+    data: utils.data_loader.DataSet
+        training data
+
+    """
+
+    log = get_logger('epsilon-greedy', 'epsilon-greedy.log', level=DEBUG)
+    return
 
 
 def bandit_test():
@@ -150,9 +193,9 @@ def bandit_test():
     ]
 
     # choose selection method from commandline argument
-    method = sys.argv[1]
+    m = sys.argv[1]
 
-    if method == 'proposed':
+    if m == 'proposed':
         # test with the new function
         logger.info('==================Proposed Method=====================')
         theta = float(sys.argv[2])
@@ -164,7 +207,7 @@ def bandit_test():
         _do_model_selection(data_sets, bandit_selection, 'model_new_{}_{}'.format(theta, gamma),
                             'selection_new_{}_{}'.format(theta, gamma))
         logger.info('==================Proposed Method Done=====================')
-    elif method == 'ucb':
+    elif m == 'ucb':
         # test with traditional ucb function
         logger.info('==================Traditional UCB=====================')
         ucb_bandit_selection = BanditModelSelection(optimizations, update_func='ucb')
@@ -203,6 +246,30 @@ def calculate_exploitation_rate(data, budget_statistics):
     budget = budget_statistics['budget'][gt_model]
 
     return budget / BUDGET
+
+
+def _get_test_result(best_optimization, data, model_selection, csv_file, pkl_file, log):
+    # save statistics to csv
+    statistics = model_selection.statistics()
+    statistics.to_csv(csv_file)
+    # save to pickle file for calculating exploitation rate
+    statistics.to_pickle(pkl_file)
+
+    # return best_v, best_model, budget
+    print(best_optimization.best_evaluation)
+    best_v = best_optimization.best_evaluation['Accuracy']
+    best_model = best_optimization.name
+    test_v = _evaluate_test_v(data, best_optimization.best_model)
+
+    log.info('===========================\n'
+             'Result of fitting on {}\n'
+             'best v: {}\n'
+             'best model: {}\n'
+             'test v: {}\n'
+             '======================'
+             .format(data.name, best_v, best_model, test_v))
+
+    return data.name, best_v, best_model, test_v
 
 
 def _get_optimizations():
@@ -263,4 +330,10 @@ def _do_model_selection(data, strategy, model_file, selection_file):
 
 
 if __name__ == '__main__':
-    ground_truth_lab()
+    # method = sys.argv[1]
+    # if method == 'ground':
+    #     ground_truth_lab()
+    # elif method == 'ucb':
+    ucb_lab()
+
+
