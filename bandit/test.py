@@ -8,6 +8,10 @@ from utils.logging_ import get_logger
 import sys
 import multiprocessing as mp
 import pandas as pd
+import pickle
+
+BUDGET = 1000
+GROUND_TRUTH_PKL = 'log/ground_truth.pkl'
 
 logger = get_logger('lab', 'bandit_test.log')
 
@@ -27,7 +31,7 @@ model_generators = [
 ]
 
 
-def find_ground_truth(data, model_generator, budget=1000):
+def find_ground_truth(data, model_generator, budget=2):
     """Find the ground truth model for each dataset
 
     Parameters
@@ -59,30 +63,73 @@ def find_ground_truth(data, model_generator, budget=1000):
 def ground_truth_lab():
     cores = mp.cpu_count()
     statistics = []
-    a = data_loader.all_data()
-    for data in data_loader.all_data():
+    ground_truth_model = {}
+    for data in data_loader.all_data()[0:1]:
         start = time.time()
         with mp.Pool(processes=cores) as pool:
             result = pool.starmap(find_ground_truth, [(data, generator) for generator in model_generators])
             data_frame = pd.DataFrame(data=result, columns=['name', 'max', 'mean', 'std'])
+            data_frame = data_frame.set_index(data_frame['name']).drop(['name'], axis=1)
 
             statistics.append((data.name, data_frame))
 
+            best_model = data_frame['max'].idxmax()
+            ground_truth_model[data.name] = best_model
+
             # save to csv
-            with open('log/{}.csv'.format(data.name), 'a') as f:
-                best_model = data_frame['name'][data_frame['max'].argmax()]
+            with open('log/gt_{}.csv'.format(data.name), 'a') as f:
                 f.write('best is {}'.format(best_model))
                 data_frame.to_csv(f, mode='a')
 
         elapsed = time.time() - start
         logger.info('g-test --- Spend {}s on {}'.format(elapsed, data.name))
 
+    with open(GROUND_TRUTH_PKL, 'wb') as f:
+        pickle.dump(ground_truth_model, f)
+
+
+def ucb_lab(data):
+    """Do model selection by traditional ucb method
+
+    Parameters
+    ----------
+
+    data: utils.data_loader.DataSet
+        training data
+
+    """
+    import logging
+    log = get_logger('ucb', 'ucb.log', level=logging.DEBUG)
+
+    optimizations = _get_optimizations()
+    model_selection = BanditModelSelection(optimizations, 'ucb')
+
+    train_x, train_y = data.train_data()
+
+    log.info('Begin fit on {}'.format(data.name))
+    start = time.time()
+
+    best_optimization = model_selection.fit(train_x, train_y, budget=1000)
+
+    log.info('Done! Spend {}s'.format(time.time() - start))
+
+    # save statistics to csv
+    statistics = model_selection.statistics()
+    statistics.to_csv('ucb_log/ucb_{}.csv'.format(data.name))
+    # save to pickle file for calculating exploitation rate
+    statistics.to_pickle('ucb_log/ucb_{}.pkl'.format(data.name))
+
+    # record best_v, best_model, budget
+    best_v = best_optimization.best_evaluation['Accuracy'][0]
+    best_model = best_optimization.name
+    test_v = _evaluate_test_v(data, best_optimization.best_model)
+
 
 def bandit_test():
     # model_generators = [m for m in inspect.getmembers(sk, inspect.isclass) if m[1].__module__ == sk.__name__]
     # filtered_models = filter(lambda p: p[0] != 'SKLearnModelGenerator' and 'SVC' not in p[0], model_generators)
 
-    optimizations = [RandomOptimization(generator, type(generator).__name__) for generator in model_generators]
+    optimizations = _get_optimizations()
 
     # get data sets
     data_sets = [
@@ -115,6 +162,68 @@ def bandit_test():
         logger.info('==================Traditional UCB Done=====================')
 
 
+def calculate_exploitation_rate(data, budget_statistics):
+    """Calculate exploitation rate
+
+    Parameters
+    ----------
+
+    budget_statistics: pandas.DataFrame
+        statistics of budget
+
+    data: utils.data_loader.DataSet
+        target data set
+
+    Returns
+    -------
+
+    exploitation_rate: float
+        exploitation rate of this method
+
+    """
+    # read ground truth model information
+    with open(GROUND_TRUTH_PKL, 'rb') as f:
+        ground_truth_models = pickle.load(f)
+
+    assert isinstance(ground_truth_models, dict)
+    gt_model = ground_truth_models[data.name]  # get ground truth model's name
+    assert isinstance(gt_model, str)
+
+    # get budget and calculate exploitation rate
+    budget = budget_statistics['budget'][gt_model]
+
+    return budget / BUDGET
+
+
+def _get_optimizations():
+    return [RandomOptimization(generator, type(generator).__name__) for generator in model_generators]
+
+
+def _evaluate_test_v(data, model):
+    """Use selected model to fit on the data
+
+    Parameters
+    ----------
+
+    data: utils.data_loader.DataSet
+        training and test data
+
+    model: classifier
+        selected model
+
+    Returns
+    -------
+
+    test_v: float
+        accuracy on test data
+    """
+    train_x, train_y = data.train_data()
+    model.fit(train_x, train_y)
+
+    test_x, test_y = data.test_data()
+    return model.score(test_x, test_y)
+
+
 def _do_model_selection(data, strategy, model_file, selection_file):
     assert isinstance(strategy, BanditModelSelection)
 
@@ -123,7 +232,7 @@ def _do_model_selection(data, strategy, model_file, selection_file):
         logger.info('Begin bandit selection on dataset {}'.format(data_name))
         start = time.time()
 
-        result = strategy.fit(train_x, train_y, 1000)
+        result = strategy.fit(train_x, train_y, BUDGET)
         assert isinstance(result, RandomOptimization)
 
         elapsed_time = time.time() - start

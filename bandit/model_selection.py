@@ -152,6 +152,26 @@ class BanditModelSelection(ModelSelection):
         self.beta = beta
 
     def fit(self, train_x, train_y, budget=200):
+        """Fit on training data and select the best model
+
+        Parameters
+        ----------
+        train_x: np.ndarray or list
+            the features
+
+        train_y: np.ndarray or list
+            the label
+
+        budget: int
+            the number of samples
+
+        Returns
+        -------
+
+        result: RandomOptimization
+            best model
+
+        """
         self._clean()  # clean history data
         self._init_each_optimizations(train_x, train_y, beta=self.beta)
 
@@ -162,9 +182,14 @@ class BanditModelSelection(ModelSelection):
         return self._best_selection()
 
     def statistics(self):
-        data = [(o.name, o.mu, o.sigma, o.square_mean, o.count, o.best_evaluation[EVALUATION_CRITERIA])
-                for o in self.optimizations]
-        return pd.DataFrame(data=data, columns=['name', 'mu', 'sigma', 'mu_Y', 'budget', 'best X'])
+        if self.update_func == 'new':
+            data = [(o.name, o.mu, o.sigma, o.square_mean, o.count, o.best_evaluation[EVALUATION_CRITERIA])
+                    for o in self.optimizations]
+            return pd.DataFrame(data=data, columns=['name', 'mu(-beta)', 'sigma', 'mu_Y', 'budget', 'best v'])
+        elif self.update_func == 'ucb':
+            data = [(o.name, o.mu, o.sigma, o.count, o.best_evaluation[EVALUATION_CRITERIA])
+                    for o in self.optimizations]
+            return pd.DataFrame(data=data, columns=['name', 'mu', 'sigma', 'budget', 'best v'])
 
     def _wrap_selection_information(self, data):
         if self.update_func is _new_func:
