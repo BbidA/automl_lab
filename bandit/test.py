@@ -65,6 +65,7 @@ def find_ground_truth(data, model_generator, budget=BUDGET):
 def ground_truth_lab():
     statistics = []
     ground_truth_model = {}
+    log = get_logger('gt', 'gt.log', level=INFO)
     for data in data_loader.all_data():
         # adult cost too much time so we ignore it
         if data.name == 'adult':
@@ -87,7 +88,7 @@ def ground_truth_lab():
                 data_frame.to_csv(f, mode='a')
 
         elapsed = time.time() - start
-        logger.info('g-test --- Spend {}s on {}'.format(elapsed, data.name))
+        log.info('g-test --- Spend {}s on {}'.format(elapsed, data.name))
 
     with open(GROUND_TRUTH_PKL, 'wb') as f:
         pickle.dump(ground_truth_model, f)

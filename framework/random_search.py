@@ -51,7 +51,7 @@ def random_search(model_generator, train_x, train_y, search_times=100):
             actual_parameter_list.append(actual_params)
             time_list.append(elapsed)
         except TimeoutError:
-            log.error('Timeout!')
+            log.error('{} {} Timeout!'.format(model_name, actual_params))
         except Exception as e:
             log.error('Error message: {}'.format(e))
         except RuntimeWarning as w:
