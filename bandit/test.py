@@ -11,7 +11,7 @@ import pandas as pd
 import pickle
 from logging import INFO, DEBUG
 
-BUDGET = 100
+BUDGET = 1000
 GROUND_TRUTH_PKL = 'log/ground_truth.pkl'
 CORES = mp.cpu_count()
 
@@ -94,7 +94,7 @@ def ground_truth_lab():
 
 
 def ucb_lab():
-    all_data = data_loader.all_data()[0:1]
+    all_data = data_loader.all_data()
     with mp.Pool(processes=CORES) as pool:
         result = pool.starmap(ucb_or_random_method, [(data, 'ucb') for data in all_data])
         df_result = pd.DataFrame(data=result, columns=['data set', 'best_v', 'best_model', 'test_v'])
@@ -103,7 +103,7 @@ def ucb_lab():
 
 
 def eg_or_sf_lab(method, record_file):
-    all_data = data_loader.all_data()[0:1]
+    all_data = data_loader.all_data()
     with mp.Pool(processes=CORES) as pool:
         result = pool.map(method, all_data)
         df_result = pd.DataFrame(data=result, columns=['data set', 'best_v', 'best_model', 'test_v'])
