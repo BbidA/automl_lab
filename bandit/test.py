@@ -3,7 +3,7 @@ import time
 import framework.sk_models as sk
 from framework.random_search import random_search
 import utils.data_loader as data_loader
-from bandit.model_selection import BanditModelSelection, RandomOptimization
+from bandit.model_selection import BanditModelSelection, RandomOptimization, EpsilonGreedySelection, SoftMaxSelection
 from utils.logging_ import get_logger
 import sys
 import multiprocessing as mp
@@ -11,8 +11,9 @@ import pandas as pd
 import pickle
 from logging import INFO, DEBUG
 
-BUDGET = 1000
+BUDGET = 100
 GROUND_TRUTH_PKL = 'log/ground_truth.pkl'
+CORES = mp.cpu_count()
 
 logger = get_logger('lab', 'bandit_test.log')
 
@@ -62,7 +63,6 @@ def find_ground_truth(data, model_generator, budget=BUDGET):
 
 
 def ground_truth_lab():
-    cores = mp.cpu_count()
     statistics = []
     ground_truth_model = {}
     for data in data_loader.all_data():
@@ -71,7 +71,7 @@ def ground_truth_lab():
             continue
 
         start = time.time()
-        with mp.Pool(processes=cores) as pool:
+        with mp.Pool(processes=CORES) as pool:
             result = pool.starmap(find_ground_truth, [(data, generator) for generator in model_generators])
             data_frame = pd.DataFrame(data=result, columns=['name', 'max', 'mean', 'std'])
             data_frame = data_frame.set_index(data_frame['name']).drop(['name'], axis=1)
@@ -94,16 +94,24 @@ def ground_truth_lab():
 
 
 def ucb_lab():
-    cores = mp.cpu_count()
-    all_data = data_loader.all_data()
-    with mp.Pool(processes=cores) as pool:
-        result = pool.map(ucb_method, all_data)
+    all_data = data_loader.all_data()[0:1]
+    with mp.Pool(processes=CORES) as pool:
+        result = pool.starmap(ucb_or_random_method, [(data, 'ucb') for data in all_data])
         df_result = pd.DataFrame(data=result, columns=['data set', 'best_v', 'best_model', 'test_v'])
         df_result.to_csv('log/ucb_lab.csv')
         df_result.to_pickle('log/ucb_lab.pkl')
 
 
-def ucb_method(data):
+def eg_or_sf_lab(method, record_file):
+    all_data = data_loader.all_data()[0:1]
+    with mp.Pool(processes=CORES) as pool:
+        result = pool.map(method, all_data)
+        df_result = pd.DataFrame(data=result, columns=['data set', 'best_v', 'best_model', 'test_v'])
+        df_result.to_csv('log/{}_lab.csv'.format(record_file))
+        df_result.to_pickle('log/{}_lab.pkl'.format(record_file))
+
+
+def ucb_or_random_method(data, method):
     """Do model selection by traditional ucb method
 
     Parameters
@@ -112,11 +120,14 @@ def ucb_method(data):
     data: utils.data_loader.DataSet
         training data
 
+    method: str
+        model selection method (only ucb or random can be choosed)
+
     """
-    log = get_logger('ucb', 'ucb.log', level=DEBUG)
+    log = get_logger(method, '{}.log'.format(method), level=DEBUG)
 
     optimizations = _get_optimizations()
-    model_selection = BanditModelSelection(optimizations, 'ucb')
+    model_selection = BanditModelSelection(optimizations, method)
 
     log.info('Begin fit on {}'.format(data.name))
     train_x, train_y = data.train_data()
@@ -127,9 +138,9 @@ def ucb_method(data):
 
     log.info('Fitting no {} is done! Spend {}s'.format(data.name, time.time() - start))
 
-    csv_file = 'log/ucb/ucb_{}.csv'.format(data.name)
-    pkl_file = 'log/ucb/ucb_{}.pkl'.format(data.name)
-    return _get_test_result(best_optimization, data, model_selection, csv_file, pkl_file, log)
+    csv_file = 'log/{}/{}_{}.csv'.format(method, method, data.name)
+    pkl_file = 'log/{}/{}_{}.pkl'.format(method, method, data.name)
+    return _get_test_result(best_optimization, data, model_selection.statistics(), csv_file, pkl_file, log)
 
 
 def proposed_lab(data):
@@ -156,15 +167,15 @@ def proposed_lab(data):
     start = time.time()
     best_optimization = model_selection.fit(train_x, train_y, budget=BUDGET)
 
-    log.info('Done! Spend {}s'.format(time.time() - start))
+    log.info('Fitting on {} is over, spend {}s'.format(data.name, time.time() - start))
 
     csv_file = 'log/proposed/proposed_{}_{}_{}.csv'.format(theta, gamma, beta)
     pkl_file = 'log/proposed/proposed_{}_{}_{}.pkl'.format(theta, gamma, beta)
 
-    return _get_test_result(best_optimization, data, model_selection, csv_file, pkl_file, log)
+    return _get_test_result(best_optimization, data, model_selection.statistics(), csv_file, pkl_file, log)
 
 
-def eg_lab(data):
+def eg_method(data):
     """Do model selection with epsilon-greedy method
 
     Parameters
@@ -175,7 +186,53 @@ def eg_lab(data):
     """
 
     log = get_logger('epsilon-greedy', 'epsilon-greedy.log', level=DEBUG)
-    return
+
+    optimizations = _get_optimizations()
+    model_selection = EpsilonGreedySelection(optimizations)
+
+    log.info('Begin fitting on {}'.format(data.name))
+    train_x, train_y = data.train_data()
+
+    start = time.time()
+    best_optimization = model_selection.fit(train_x, train_y, budget=BUDGET)
+    elapsed = time.time() - start
+
+    log.info('Fitting on {} is over, spend {}s'.format(data.name, elapsed))
+
+    csv_file = 'log/eg/eg_{}.csv'.format(data.name)
+    pkl_file = 'log/eg/eg_{}.pkl'.format(data.name)
+
+    return _get_test_result(best_optimization, data, model_selection.statistics(), csv_file, pkl_file, log)
+
+
+def softmax_method(data):
+    """Do model selection with softmax method
+
+    Parameters
+    ----------
+    data: utils.data_loader.DataSet
+        training data
+
+    """
+
+    log = get_logger('softmax', 'softmax.log', level=DEBUG)
+
+    optimizations = _get_optimizations()
+    model_selection = SoftMaxSelection(optimizations)
+
+    log.info('Begin fitting on {}'.format(data.name))
+    train_x, train_y = data.train_data()
+
+    start = time.time()
+    best_optimization = model_selection.fit(train_x, train_y, temperature=0.5, budget=BUDGET)
+    elapsed = time.time() - start
+
+    log.info('Fitting on {} is over, spend {}s'.format(data.name, elapsed))
+
+    csv_file = 'log/sf/sf_{}.csv'.format(data.name)
+    pkl_file = 'log/sf/sf_{}.pkl'.format(data.name)
+
+    return _get_test_result(best_optimization, data, model_selection.statistics(), csv_file, pkl_file, log)
 
 
 def bandit_test():
@@ -248,9 +305,8 @@ def calculate_exploitation_rate(data, budget_statistics):
     return budget / BUDGET
 
 
-def _get_test_result(best_optimization, data, model_selection, csv_file, pkl_file, log):
+def _get_test_result(best_optimization, data, statistics, csv_file, pkl_file, log):
     # save statistics to csv
-    statistics = model_selection.statistics()
     statistics.to_csv(csv_file)
     # save to pickle file for calculating exploitation rate
     statistics.to_pickle(pkl_file)
@@ -261,7 +317,7 @@ def _get_test_result(best_optimization, data, model_selection, csv_file, pkl_fil
     best_model = best_optimization.name
     test_v = _evaluate_test_v(data, best_optimization.best_model)
 
-    log.info('===========================\n'
+    log.info('\n===========================\n'
              'Result of fitting on {}\n'
              'best v: {}\n'
              'best model: {}\n'
@@ -330,10 +386,12 @@ def _do_model_selection(data, strategy, model_file, selection_file):
 
 
 if __name__ == '__main__':
-    # method = sys.argv[1]
-    # if method == 'ground':
-    #     ground_truth_lab()
-    # elif method == 'ucb':
-    ucb_lab()
-
-
+    method_choice = sys.argv[1]
+    if method_choice == 'ground':
+        ground_truth_lab()
+    elif method_choice == 'ucb':
+        ucb_lab()
+    elif method_choice == 'sf':
+        eg_or_sf_lab(softmax_method, 'sf')
+    elif method_choice == 'eg':
+        eg_or_sf_lab(eg_method, 'eg')

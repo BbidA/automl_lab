@@ -3,6 +3,11 @@ import logging
 
 def get_logger(logger_name, log_file_name, level=logging.INFO):
     logger = logging.getLogger(logger_name)
+
+    # checks to see whether this logger has any handlers configured
+    if logger.hasHandlers():
+        return logger
+
     logger.setLevel(level)
 
     # setup file handler

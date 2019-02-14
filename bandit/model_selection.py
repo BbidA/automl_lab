@@ -18,7 +18,7 @@ class RandomOptimization:
         self.time_out_count = 0
 
         # Evaluation results
-        self.instances = pd.DataFrame()
+        self.instances = pd.DataFrame(columns=['Raw Parameters', 'Actual Parameters', 'Accuracy', 'Time'])
 
         # Gaussian parameters
         self.mu = 0
@@ -38,6 +38,8 @@ class RandomOptimization:
 
     @property
     def best_evaluation(self):
+        if self.instances.empty:
+            return pd.Series(data=[0], index=['Accuracy'])
         return self.instances.sort_values(by=EVALUATION_CRITERIA, ascending=False).iloc[0]
 
     @property
@@ -107,7 +109,7 @@ def _new_func(optimization, t, theta=1, record=None, gamma=1):
 
 
 def _ucb_func(optimization, t, record=None):
-    second_term = np.sqrt(2 * np.log(t - 1) / optimization.count)
+    second_term = np.sqrt(2 * np.log(t) / optimization.count)
     result = optimization.mu + second_term
 
     if record is not None:
@@ -238,8 +240,10 @@ class EpsilonGreedySelection(ModelSelection):
                 selection = random.choice(self.optimizations)
             else:
                 # do exploitation
-                values = [o.mu for o in self.optimizations]
-                selection = self.optimizations[np.argmax(values)]
+                values = np.array([o.mu for o in self.optimizations])
+                max_items = np.argwhere(values == values.max())
+                max_item = random.choice(max_items.reshape(max_items.shape[0]))
+                selection = self.optimizations[max_item]
             assert isinstance(selection, RandomOptimization)
 
             selection.run_one_step(train_x, train_y)
@@ -269,5 +273,3 @@ class SoftMaxSelection(ModelSelection):
                 return self.optimizations[i - 1]
 
         assert False
-
-

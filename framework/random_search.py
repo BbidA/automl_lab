@@ -84,5 +84,5 @@ def random_sample_parameters(hp_space):
 
     assert len(result) == len(hp_space)
 
-    # result is used in evaluation, actual_params is used in logging
+    # result is used in evaluation(raw parameters), actual_params is used in logging
     return result, actual_params
