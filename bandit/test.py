@@ -94,13 +94,13 @@ def ground_truth_lab():
         pickle.dump(ground_truth_model, f)
 
 
-def ucb_lab():
+def ucb_lab(method):
     all_data = data_loader.all_data()
     with mp.Pool(processes=CORES) as pool:
-        result = pool.starmap(ucb_or_random_method, [(data, 'ucb') for data in all_data])
+        result = pool.starmap(ucb_or_random_method, [(data, method) for data in all_data])
         df_result = pd.DataFrame(data=result, columns=['data set', 'best_v', 'best_model', 'test_v'])
-        df_result.to_csv('log/ucb_lab.csv')
-        df_result.to_pickle('log/ucb_lab.pkl')
+        df_result.to_csv('log/{}_lab.csv'.format(method))
+        df_result.to_pickle('log/{}_lab.pkl'.format(method))
 
 
 def eg_or_sf_lab(method, record_file):
@@ -144,20 +144,22 @@ def ucb_or_random_method(data, method):
     return _get_test_result(best_optimization, data, model_selection.statistics(), csv_file, pkl_file, log)
 
 
-def proposed_lab(data):
+def proposed_lab(data, theta, gamma, beta):
     """Do model selection with proposed method
 
     Parameters
     ----------
     data: utils.data_loader.DataSet
         training data
-    """
-    log = get_logger('proposed', 'proposed.log', level=DEBUG)
 
-    # get commandline parameters
-    theta = float(sys.argv[2])
-    gamma = float(sys.argv[3])
-    beta = float(sys.argv[4])
+    theta: float
+
+    gamma: float
+
+    beta: float
+    """
+    log_name = 'proposed-{}-{}-{}'.format(theta, gamma, beta)
+    log = get_logger(log_name, 'log/' + log_name + '.log', level=DEBUG)
 
     optimizations = _get_optimizations()
     model_selection = BanditModelSelection(optimizations, 'new', theta=theta, gamma=gamma, beta=beta)
@@ -391,8 +393,11 @@ if __name__ == '__main__':
     if method_choice == 'ground':
         ground_truth_lab()
     elif method_choice == 'ucb':
-        ucb_lab()
+        ucb_lab('ucb')
     elif method_choice == 'sf':
         eg_or_sf_lab(softmax_method, 'sf')
     elif method_choice == 'eg':
         eg_or_sf_lab(eg_method, 'eg')
+    elif method_choice == 'random':
+        ucb_lab('random')
+
