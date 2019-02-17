@@ -19,7 +19,7 @@ def get_logger(logger_name, log_file_name, level=logging.INFO):
     console_handler.setLevel(level)
 
     # setup format of logging
-    formatter = logging.Formatter('%(levelname)s - %(message)s')
+    formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
     file_handler.setFormatter(formatter)
     console_handler.setFormatter(formatter)
 

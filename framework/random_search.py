@@ -36,7 +36,7 @@ def random_search(model_generator, train_x, train_y, search_times=100):
         log.debug('[{}]: parameters: {}'.format(model_name, actual_params))
         try:
             start = time.time()
-            signal.alarm(90)
+            signal.alarm(300)
 
             accuracy = evaluator.evaluate(raw_params)
 

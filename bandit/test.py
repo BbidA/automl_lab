@@ -11,11 +11,9 @@ import pandas as pd
 import pickle
 from logging import INFO, DEBUG
 
-BUDGET = 1000
+BUDGET = 20
 GROUND_TRUTH_PKL = 'log/ground_truth.pkl'
 CORES = mp.cpu_count()
-
-logger = get_logger('lab', 'bandit_test.log')
 
 model_generators = [
     sk.DecisionTree(),
@@ -56,22 +54,31 @@ def find_ground_truth(data, model_generator, budget=BUDGET):
 
     """
     train_x, train_y = data.train_data()
+    model_name = type(model_generator).__name__
+    start = time.time()
+    log = get_logger('gt.model', '', level=INFO)
+    log.info('{} --- {} start fitting'.format(data.name, model_name))
+
     # begin sampling
     result = random_search(model_generator, train_x, train_y, search_times=budget)
+
+    log.info('{} --- {} end running, spend {}s'.format(data.name, model_name, time.time() - start))
     acc_column = result['Accuracy']
-    return type(model_generator).__name__, acc_column.max(), acc_column.mean(), acc_column.std()
+    return model_name, acc_column.max(), acc_column.mean(), acc_column.std()
 
 
 def ground_truth_lab():
     statistics = []
     ground_truth_model = {}
-    log = get_logger('gt', 'gt.log', level=INFO)
+    log = get_logger('gt', 'log/gt.log', level=INFO)
     for data in data_loader.all_data():
         # adult cost too much time so we ignore it
         if data.name == 'adult':
             continue
 
         start = time.time()
+        log.info('Start finding ground truth model for data set {}'.format(data.name))
+
         with mp.Pool(processes=CORES) as pool:
             result = pool.starmap(find_ground_truth, [(data, generator) for generator in model_generators])
             data_frame = pd.DataFrame(data=result, columns=['name', 'max', 'mean', 'std'])
@@ -88,7 +95,7 @@ def ground_truth_lab():
                 data_frame.to_csv(f, mode='a')
 
         elapsed = time.time() - start
-        log.info('g-test --- Spend {}s on {}'.format(elapsed, data.name))
+        log.info('g-test --- Fitting on {} is over, spend {}s'.format(data.name, elapsed))
 
     with open(GROUND_TRUTH_PKL, 'wb') as f:
         pickle.dump(ground_truth_model, f)
@@ -122,10 +129,10 @@ def ucb_or_random_method(data, method):
         training data
 
     method: str
-        model selection method (only ucb or random can be choosed)
+        model selection method (only ucb or random can be chosen)
 
     """
-    log = get_logger(method, '{}.log'.format(method), level=DEBUG)
+    log = get_logger(method, 'log/{}/{}.log'.format(method, method), level=DEBUG)
 
     optimizations = _get_optimizations()
     model_selection = BanditModelSelection(optimizations, method)
@@ -144,7 +151,20 @@ def ucb_or_random_method(data, method):
     return _get_test_result(best_optimization, data, model_selection.statistics(), csv_file, pkl_file, log)
 
 
-def proposed_lab(data, theta, gamma, beta):
+def proposed_lab():
+    theta = float(sys.argv[2])
+    gamma = float(sys.argv[3])
+    beta = float(sys.argv[4])
+
+    all_data = data_loader.all_data()[0:2]
+    with mp.Pool(processes=CORES) as pool:
+        result = pool.starmap(proposed_method, [(data, theta, gamma, beta) for data in all_data])
+        df_result = pd.DataFrame(data=result, columns=['data set', 'best_v', 'best_model', 'test_v'])
+        df_result.to_csv('log/proposed/proposed_{}_{}_{}.csv'.format(theta, gamma, beta))
+        df_result.to_pickle('log/proposed/proposed_{}_{}_{}.pkl'.format(theta, gamma, beta))
+
+
+def proposed_method(data, theta, gamma, beta):
     """Do model selection with proposed method
 
     Parameters
@@ -159,7 +179,7 @@ def proposed_lab(data, theta, gamma, beta):
     beta: float
     """
     log_name = 'proposed-{}-{}-{}'.format(theta, gamma, beta)
-    log = get_logger(log_name, 'log/' + log_name + '.log', level=DEBUG)
+    log = get_logger(log_name, 'log/proposed/' + log_name + '.log', level=DEBUG)
 
     optimizations = _get_optimizations()
     model_selection = BanditModelSelection(optimizations, 'new', theta=theta, gamma=gamma, beta=beta)
@@ -172,8 +192,8 @@ def proposed_lab(data, theta, gamma, beta):
 
     log.info('Fitting on {} is over, spend {}s'.format(data.name, time.time() - start))
 
-    csv_file = 'log/proposed/proposed_{}_{}_{}.csv'.format(theta, gamma, beta)
-    pkl_file = 'log/proposed/proposed_{}_{}_{}.pkl'.format(theta, gamma, beta)
+    csv_file = 'log/proposed/proposed_{}_{}_{}_{}.csv'.format(theta, gamma, beta, data.name)
+    pkl_file = 'log/proposed/proposed_{}_{}_{}_{}.pkl'.format(theta, gamma, beta, data.name)
 
     return _get_test_result(best_optimization, data, model_selection.statistics(), csv_file, pkl_file, log)
 
@@ -188,7 +208,7 @@ def eg_method(data):
 
     """
 
-    log = get_logger('epsilon-greedy', 'epsilon-greedy.log', level=DEBUG)
+    log = get_logger('epsilon-greedy', 'log/eg/epsilon-greedy.log', level=DEBUG)
 
     optimizations = _get_optimizations()
     model_selection = EpsilonGreedySelection(optimizations)
@@ -218,7 +238,7 @@ def softmax_method(data):
 
     """
 
-    log = get_logger('softmax', 'softmax.log', level=DEBUG)
+    log = get_logger('softmax', 'log/sf/softmax.log', level=DEBUG)
 
     optimizations = _get_optimizations()
     model_selection = SoftMaxSelection(optimizations)
@@ -236,43 +256,6 @@ def softmax_method(data):
     pkl_file = 'log/sf/sf_{}.pkl'.format(data.name)
 
     return _get_test_result(best_optimization, data, model_selection.statistics(), csv_file, pkl_file, log)
-
-
-def bandit_test():
-    # model_generators = [m for m in inspect.getmembers(sk, inspect.isclass) if m[1].__module__ == sk.__name__]
-    # filtered_models = filter(lambda p: p[0] != 'SKLearnModelGenerator' and 'SVC' not in p[0], model_generators)
-
-    optimizations = _get_optimizations()
-
-    # get data sets
-    data_sets = [
-        ('adult', data_loader.adult_dataset()),
-        ('cmc', data_loader.cmc_dataset()),
-        ('car', data_loader.car_dataset()),
-        ('banknote', data_loader.banknote_dataset())
-    ]
-
-    # choose selection method from commandline argument
-    m = sys.argv[1]
-
-    if m == 'proposed':
-        # test with the new function
-        logger.info('==================Proposed Method=====================')
-        theta = float(sys.argv[2])
-        gamma = float(sys.argv[3])
-        beta = float(sys.argv[4])
-
-        logger.info("Set theta = {}".format(theta))
-        bandit_selection = BanditModelSelection(optimizations, update_func='new', theta=theta, gamma=gamma, beta=beta)
-        _do_model_selection(data_sets, bandit_selection, 'model_new_{}_{}'.format(theta, gamma),
-                            'selection_new_{}_{}'.format(theta, gamma))
-        logger.info('==================Proposed Method Done=====================')
-    elif m == 'ucb':
-        # test with traditional ucb function
-        logger.info('==================Traditional UCB=====================')
-        ucb_bandit_selection = BanditModelSelection(optimizations, update_func='ucb')
-        _do_model_selection(data_sets, ucb_bandit_selection, 'model_ucb', 'selection_ucb')
-        logger.info('==================Traditional UCB Done=====================')
 
 
 def calculate_exploitation_rate(data, budget_statistics):
@@ -360,34 +343,6 @@ def _evaluate_test_v(data, model):
     return model.score(test_x, test_y)
 
 
-def _do_model_selection(data, strategy, model_file, selection_file):
-    assert isinstance(strategy, BanditModelSelection)
-
-    for data_name, (train_x, train_y) in data:
-
-        logger.info('Begin bandit selection on dataset {}'.format(data_name))
-        start = time.time()
-
-        result = strategy.fit(train_x, train_y, BUDGET)
-        assert isinstance(result, RandomOptimization)
-
-        elapsed_time = time.time() - start
-        logger.info('Bandit selection done, spend {}s\n\n'.format(elapsed_time))
-
-        logger.info('Selection result: \n{}\n\n'.format(result))
-        logger.info('All models information:\n{}\n\n'.format(strategy.show_models()))
-
-        strategy.statistics().to_csv('log/{}_{}.csv'.format(model_file, data_name), mode='a')
-        with open('log/{}_{}.csv'.format(selection_file, data_name), 'a') as f:
-            count = 13  # used to represent selection count
-            for record in strategy.param_change_info:
-                f.write('t = {}'.format(count))
-                record.to_csv(f, mode='a')
-                f.write('\n\n')
-
-                count += 1
-
-
 if __name__ == '__main__':
     method_choice = sys.argv[1]
     if method_choice == 'ground':
@@ -400,4 +355,5 @@ if __name__ == '__main__':
         eg_or_sf_lab(eg_method, 'eg')
     elif method_choice == 'random':
         ucb_lab('random')
-
+    elif method_choice == 'proposed':
+        proposed_lab()

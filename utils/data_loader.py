@@ -23,7 +23,7 @@ def all_data():
     for root, dirs, files in os.walk(data_dir):
         for file in files:
             if 'train_data.pkl' in file:
-                data_name = file.split('_')[0]
+                data_name = file[:file.find('_train_data.pkl')]
                 data.append(DataSet(data_name))
 
     return data
