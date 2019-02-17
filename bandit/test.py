@@ -11,7 +11,7 @@ import pandas as pd
 import pickle
 from logging import INFO, DEBUG
 
-BUDGET = 20
+BUDGET = 1000
 GROUND_TRUTH_PKL = 'log/ground_truth.pkl'
 CORES = mp.cpu_count()
 
@@ -156,7 +156,7 @@ def proposed_lab():
     gamma = float(sys.argv[3])
     beta = float(sys.argv[4])
 
-    all_data = data_loader.all_data()[0:2]
+    all_data = data_loader.all_data()
     with mp.Pool(processes=CORES) as pool:
         result = pool.starmap(proposed_method, [(data, theta, gamma, beta) for data in all_data])
         df_result = pd.DataFrame(data=result, columns=['data set', 'best_v', 'best_model', 'test_v'])
