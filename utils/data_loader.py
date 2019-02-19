@@ -18,15 +18,26 @@ def dataset_reader(train_file):
     return train_features, train_labels
 
 
-def all_data():
+def all_data(include=None, exclude=None):
     data = []
     for root, dirs, files in os.walk(data_dir):
         for file in files:
             if 'train_data.pkl' in file:
                 data_name = file[:file.find('_train_data.pkl')]
-                data.append(DataSet(data_name))
+                if include is not None:
+                    if data_name in include:
+                        data.append(DataSet(data_name))
+                elif exclude is not None:
+                    if data_name not in exclude:
+                        data.append(DataSet(data_name))
+                else:
+                    data.append(DataSet(data_name))
 
     return data
+
+
+def load_data_sets(names):
+    return [DataSet(name) for name in names]
 
 
 def adult_dataset():
@@ -70,6 +81,9 @@ class DataSet:
 
     def __init__(self, name):
         self.name = name
+
+    def __repr__(self):
+        return 'DataSet({})'.format(self.name)
 
     def train_data(self):
         file = '{}_train_data.pkl'.format(self.name)

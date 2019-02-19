@@ -72,10 +72,6 @@ def ground_truth_lab():
     ground_truth_model = {}
     log = get_logger('gt', 'log/gt.log', level=INFO)
     for data in data_loader.all_data():
-        # adult cost too much time so we ignore it
-        if data.name == 'adult':
-            continue
-
         start = time.time()
         log.info('Start finding ground truth model for data set {}'.format(data.name))
 
