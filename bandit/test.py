@@ -11,6 +11,8 @@ import pandas as pd
 import pickle
 from logging import INFO, DEBUG
 
+ALL_DATA = data_loader.all_data()
+
 BUDGET = 1000
 GROUND_TRUTH_PKL = 'log/ground_truth.pkl'
 CORES = mp.cpu_count()
@@ -71,7 +73,7 @@ def ground_truth_lab():
     statistics = []
     ground_truth_model = {}
     log = get_logger('gt', 'log/gt.log', level=INFO)
-    for data in data_loader.all_data():
+    for data in ALL_DATA:
         start = time.time()
         log.info('Start finding ground truth model for data set {}'.format(data.name))
 
@@ -98,16 +100,15 @@ def ground_truth_lab():
 
 
 def ucb_lab(method):
-    all_data = data_loader.all_data()
     with mp.Pool(processes=CORES) as pool:
-        result = pool.starmap(ucb_or_random_method, [(data, method) for data in all_data])
+        result = pool.starmap(ucb_or_random_method, [(data, method) for data in ALL_DATA])
         df_result = pd.DataFrame(data=result, columns=['data set', 'best_v', 'best_model', 'test_v'])
         df_result.to_csv('log/{}_lab.csv'.format(method))
         df_result.to_pickle('log/{}_lab.pkl'.format(method))
 
 
 def eg_or_sf_lab(method, record_file):
-    all_data = data_loader.all_data()
+    all_data = ALL_DATA
     with mp.Pool(processes=CORES) as pool:
         result = pool.map(method, all_data)
         df_result = pd.DataFrame(data=result, columns=['data set', 'best_v', 'best_model', 'test_v'])
@@ -152,7 +153,7 @@ def proposed_lab():
     gamma = float(sys.argv[3])
     beta = float(sys.argv[4])
 
-    all_data = data_loader.all_data()
+    all_data = ALL_DATA
     with mp.Pool(processes=CORES) as pool:
         result = pool.starmap(proposed_method, [(data, theta, gamma, beta) for data in all_data])
         df_result = pd.DataFrame(data=result, columns=['data set', 'best_v', 'best_model', 'test_v'])
