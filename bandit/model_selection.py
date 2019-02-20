@@ -5,6 +5,7 @@ import pandas as pd
 
 from framework.random_search import random_search
 import random
+import logging
 
 EVALUATION_CRITERIA = 'Accuracy'
 
@@ -102,7 +103,7 @@ def _new_func(optimization, t, theta=1, record=None, gamma=1):
 
     if record is not None:
         assert isinstance(record, list)
-        record.append((optimization.name, optimization.mu, second_term,
+        record.append((optimization.name, optimization.mu, optimization.square_mean, second_term,
                        third_term, forth_term, third_term + forth_term, result))
 
     return result
@@ -120,8 +121,9 @@ def _ucb_func(optimization, t, record=None):
 
 
 class ModelSelection:
-    def __init__(self, optimizations):
+    def __init__(self, optimizations, logging_level=logging.DEBUG):
         self.optimizations = optimizations
+        self._logger = self._init_logger(logging_level)
 
     def show_models(self):
         models_info = ''
@@ -145,6 +147,20 @@ class ModelSelection:
         best_index = np.argmax(best_results)
 
         return self.optimizations[best_index]
+
+    @staticmethod
+    def _init_logger(level):
+        logger = logging.getLogger('model_selection')
+        logger.setLevel(level
+                        )
+        console_handler = logging.StreamHandler()
+        console_handler.setLevel(level)
+
+        formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+        console_handler.setFormatter(formatter)
+
+        logger.addHandler(console_handler)
+        return logger
 
 
 class BanditModelSelection(ModelSelection):
@@ -180,9 +196,11 @@ class BanditModelSelection(ModelSelection):
 
         """
         self._clean()  # clean history data
+        self._logger.debug('Initializing')
         self._init_each_optimizations(train_x, train_y, beta=self.beta)
 
         for t in range(len(self.optimizations) + 1, budget + 1):
+            self._logger.debug('Process: {} / budget'.format(t))
             next_model = self._next_selection(t)
             next_model.run_one_step(train_x, train_y, beta=self.beta)
 
@@ -198,10 +216,10 @@ class BanditModelSelection(ModelSelection):
             return super().statistics()
 
     def _wrap_selection_information(self, data):
-        if self.update_func is _new_func:
-            return pd.DataFrame(data=data, columns=['name', 'mu', 'sqrt(mu_Y)', 'third term',
+        if self.update_func == 'new':
+            return pd.DataFrame(data=data, columns=['name', 'mu', 'square_mean', 'sqrt(mu_Y)', 'third term',
                                                     'forth term', 'sum of last two', 'sum all'])
-        elif self.update_func is _ucb_func:
+        elif self.update_func == 'ucb':
             return pd.DataFrame(data=data, columns=['name', 'mu', 'second_term', 'sum all'])
 
     def _init_each_optimizations(self, train_x, train_y, beta):
@@ -234,6 +252,7 @@ class EpsilonGreedySelection(ModelSelection):
 
     def fit(self, train_x, train_y, epsilon=0.1, budget=200):
         for i in range(1, budget + 1):
+            self._logger.debug('Process: {} / {}'.format(i, budget))
             point = random.uniform(0, 1)
             if point < epsilon:
                 # do exploration
@@ -255,6 +274,7 @@ class SoftMaxSelection(ModelSelection):
 
     def fit(self, train_x, train_y, temperature=0.1, budget=200):
         for i in range(budget):
+            self._logger.debug('Process: {} / {}'.format(i + 1, budget))
             model = self._next_selection(temperature)
             model.run_one_step(train_x, train_y)
 

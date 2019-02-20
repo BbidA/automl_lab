@@ -11,12 +11,12 @@ import pandas as pd
 import pickle
 from logging import INFO, DEBUG
 
-ALL_DATA = data_loader.all_data()
+ALL_DATA = data_loader.all_data(exclude=['adult', 'banknote', 'credit', 'egg', 'flag', 'seismic', 'wpbc', 'yeast'])
 PROPOSED_DATA = data_loader.data_for_proposed_method()
 
 BUDGET = 1000
 GROUND_TRUTH_PKL = 'log/ground_truth.pkl'
-CORES = mp.cpu_count()
+CORES = 1  # one thread see function one_thread_lab(method)
 
 model_generators = [
     sk.DecisionTree(),
@@ -32,6 +32,31 @@ model_generators = [
     sk.RandomForest(),
     sk.SGD()
 ]
+
+
+def one_thread_lab(method):
+    result = []
+    if method == 'proposed':
+        theta = sys.argv[2]
+        gamma = sys.argv[3]
+        for (data, beta) in PROPOSED_DATA:
+            result.append(proposed_method(data, theta, gamma, beta))
+        csv_file = 'log/proposed/proposed-{}-{}-total.csv'.format(theta, gamma)
+        pkl_file = 'log/proposed/proposed-{}-{}-total.pkl'.format(theta, gamma)
+    else:
+        for data in ALL_DATA:
+            if method == 'ucb' or method == 'random':
+                result.append(ucb_or_random_method(data, method))
+            elif method == 'eg':
+                result.append(eg_method(data))
+            elif method == 'sf':
+                result.append(softmax_method(data))
+        csv_file = 'log/{}/{}-total-statistics.csv'.format(method, method)
+        pkl_file = 'log/{}/{}-total-statistics.pkl'.format(method, method)
+
+    df_result = pd.DataFrame(data=result, columns=['data set', 'best_v', 'best_model', 'test_v'])
+    df_result.to_csv(csv_file)
+    df_result.to_pickle(pkl_file)
 
 
 def find_ground_truth(data, model_generator, budget=BUDGET):
@@ -161,7 +186,7 @@ def proposed_lab():
         df_result.to_pickle('log/proposed/proposed_{}_{}.pkl'.format(theta, gamma))
 
 
-def proposed_method(data, theta, gamma, beta):
+def proposed_method(data, theta, gamma, beta, show_selection_detail=False):
     """Do model selection with proposed method
 
     Parameters
@@ -187,15 +212,16 @@ def proposed_method(data, theta, gamma, beta):
     start = time.time()
     best_optimization = model_selection.fit(train_x, train_y, budget=BUDGET)
 
-    # # write parameter change information
-    # with open('log/ps_{}_{}_{}.csv'.format(theta, gamma, beta), 'a') as f:
-    #     count = 13
-    #     for record in model_selection.param_change_info:
-    #         f.write('t = {}'.format(count))
-    #         record.to_csv(f, mode='a')
-    #         f.write('\n\n')
-    #
-    #         count += 1
+    # write parameter change information
+    if show_selection_detail:
+        with open('log/ps_{}_{}_{}.csv'.format(theta, gamma, data.name), 'a') as f:
+            count = len(model_generators)
+            for record in model_selection.param_change_info:
+                f.write('t = {}'.format(count))
+                record.to_csv(f, mode='a')
+                f.write('\n\n')
+
+                count += 1
 
     log.info('Fitting on {} is over, spend {}s'.format(data.name, time.time() - start))
 
@@ -352,15 +378,17 @@ def _evaluate_test_v(data, model):
 
 if __name__ == '__main__':
     method_choice = sys.argv[1]
-    if method_choice == 'ground':
-        ground_truth_lab()
-    elif method_choice == 'ucb':
-        ucb_lab('ucb')
-    elif method_choice == 'sf':
-        eg_or_sf_lab(softmax_method, 'sf')
-    elif method_choice == 'eg':
-        eg_or_sf_lab(eg_method, 'eg')
-    elif method_choice == 'random':
-        ucb_lab('random')
-    elif method_choice == 'proposed':
-        proposed_lab()
+    # if method_choice == 'ground':
+    #     ground_truth_lab()
+    # elif method_choice == 'ucb':
+    #     ucb_lab('ucb')
+    # elif method_choice == 'sf':
+    #     eg_or_sf_lab(softmax_method, 'sf')
+    # elif method_choice == 'eg':
+    #     eg_or_sf_lab(eg_method, 'eg')
+    # elif method_choice == 'random':
+    #     ucb_lab('random')
+    # elif method_choice == 'proposed':
+    #     proposed_lab()
+    # proposed_method(data_loader.DataSet('messidor'), 0.01, 20, 0.65)
+    one_thread_lab(method_choice)
