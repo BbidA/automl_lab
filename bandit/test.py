@@ -22,11 +22,11 @@ model_generators = [
     sk.AdaBoost(),
     sk.QuadraticDiscriminantAnalysis(),
     sk.GaussianNB(),
-    sk.LinearSVC(),
+    # sk.LinearSVC(),
     sk.KNeighbors(),
     sk.BernoulliNB(),
     sk.ExtraTree(),
-    sk.MultinomialNB(),
+    # sk.MultinomialNB(),
     sk.PassiveAggressive(),
     sk.RandomForest(),
     sk.SGD()
@@ -186,6 +186,16 @@ def proposed_method(data, theta, gamma, beta):
 
     start = time.time()
     best_optimization = model_selection.fit(train_x, train_y, budget=BUDGET)
+
+    # # write parameter change information
+    # with open('log/ps_{}_{}_{}.csv'.format(theta, gamma, beta), 'a') as f:
+    #     count = 13
+    #     for record in model_selection.param_change_info:
+    #         f.write('t = {}'.format(count))
+    #         record.to_csv(f, mode='a')
+    #         f.write('\n\n')
+    #
+    #         count += 1
 
     log.info('Fitting on {} is over, spend {}s'.format(data.name, time.time() - start))
 
