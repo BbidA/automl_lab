@@ -12,6 +12,7 @@ import pickle
 from logging import INFO, DEBUG
 
 ALL_DATA = data_loader.all_data()
+PROPOSED_DATA = data_loader.data_for_proposed_method()
 
 BUDGET = 1000
 GROUND_TRUTH_PKL = 'log/ground_truth.pkl'
@@ -153,9 +154,9 @@ def proposed_lab():
     gamma = float(sys.argv[3])
     beta = float(sys.argv[4])
 
-    all_data = ALL_DATA
+    all_data = PROPOSED_DATA
     with mp.Pool(processes=CORES) as pool:
-        result = pool.starmap(proposed_method, [(data, theta, gamma, beta) for data in all_data])
+        result = pool.starmap(proposed_method, [(data, theta, gamma, beta) for (data, beta) in all_data])
         df_result = pd.DataFrame(data=result, columns=['data set', 'best_v', 'best_model', 'test_v'])
         df_result.to_csv('log/proposed/proposed_{}_{}_{}.csv'.format(theta, gamma, beta))
         df_result.to_pickle('log/proposed/proposed_{}_{}_{}.pkl'.format(theta, gamma, beta))
