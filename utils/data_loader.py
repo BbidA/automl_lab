@@ -57,6 +57,27 @@ def data_for_proposed_method():
     ]
 
 
+def data_for_auto_sklearn():
+    return [
+        (DataSet('balanceScale'), 0.82),
+        (DataSet('car'), 0.70),
+        (DataSet('chess'), 0.87),
+        (DataSet('cylinder'), 0.70),
+        (DataSet('ecoli'), 0.78),
+        (DataSet('glass'), 0.58),
+        (DataSet('iris'), 0.95),
+        (DataSet('magic04'), 0.83),
+        (DataSet('messidor'), 0.65),
+        (DataSet('mushroom'), 0.92),
+        (DataSet('nursery'), 0.65),
+        (DataSet('occupancy'), 0.90),
+        (DataSet('spambase'), 0.85),
+        (DataSet('statlogSegment'), 0.90),
+        (DataSet('wdbc'), 0.93),
+        (DataSet('wilt'), 0.95)
+    ]
+
+
 def load_data_sets(names):
     return [DataSet(name) for name in names]
 

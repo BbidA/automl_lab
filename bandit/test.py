@@ -167,7 +167,7 @@ def ucb_or_random_method(data, method):
 
     best_optimization = model_selection.fit(train_x, train_y, budget=BUDGET)
 
-    log.info('Fitting no {} is done! Spend {}s'.format(data.name, time.time() - start))
+    log.info('Fitting on {} is done! Spend {}s'.format(data.name, time.time() - start))
 
     csv_file = 'log/{}/{}_{}.csv'.format(method, method, data.name)
     pkl_file = 'log/{}/{}_{}.pkl'.format(method, method, data.name)
