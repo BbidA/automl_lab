@@ -11,7 +11,8 @@ import pandas as pd
 import pickle
 from logging import INFO, DEBUG
 
-ALL_DATA = data_loader.all_data(exclude=['adult', 'banknote', 'credit', 'egg', 'flag', 'seismic', 'wpbc', 'yeast'])
+ALL_DATA = data_loader.all_data(
+    exclude=['adult', 'banknote', 'credit', 'egg', 'flag', 'seismic', 'wpbc', 'yeast', 'magic04'])
 PROPOSED_DATA = data_loader.data_for_proposed_method()
 
 BUDGET = 1000
