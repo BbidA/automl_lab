@@ -151,8 +151,11 @@ class ModelSelection:
     @staticmethod
     def _init_logger(level):
         logger = logging.getLogger('model_selection')
-        logger.setLevel(level
-                        )
+        logger.setLevel(level)
+
+        if logger.hasHandlers():
+            return logger
+
         console_handler = logging.StreamHandler()
         console_handler.setLevel(level)
 
