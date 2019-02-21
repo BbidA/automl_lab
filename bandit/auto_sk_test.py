@@ -66,5 +66,9 @@ def auto_sk_method(data, time_left):
 
     return data.name, best_score, test_v
 
+
+if __name__ == '__main__':
+    auto_sk_lab()
+
 # save whole model
 # joblib.dump(classifier, 'log/auto_sk/auto_sk_{}.joblib'.format(data.name))
