@@ -80,8 +80,8 @@ def auto_sk_method(data, time_left):
 
 
 if __name__ == '__main__':
-    # arg_start = int(sys.argv[1])
-    # arg_end = int(sys.argv[2])
+    arg_start = int(sys.argv[1])
+    arg_end = int(sys.argv[2])
     auto_sk_lab(0, 4)
 
 # save whole model
