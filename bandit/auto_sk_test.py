@@ -37,8 +37,8 @@ def auto_sk_lab(start, end):
                     '{}'.format(data.name, time.time() - start, method_result))
 
     df_result = pd.DataFrame(data=result, columns=['data set', 'best v', 'test v'])
-    df_result.to_csv('log/auto_sk/auto-sk-total.csv')
-    df_result.to_pickle('log/auto_sk/auto-sk-total.pkl')
+    df_result.to_csv('log/auto_sk/auto-sk-{}to{}.csv'.format(start, end))
+    df_result.to_pickle('log/auto_sk/auto-sk-{}tp{}.pkl'.format(start, end))
 
 
 def auto_sk_method(data, time_left):
@@ -80,8 +80,8 @@ def auto_sk_method(data, time_left):
 
 
 if __name__ == '__main__':
-    arg_start = sys.argv[1]
-    arg_end = sys.argv[2]
+    arg_start = int(sys.argv[1])
+    arg_end = int(sys.argv[2])
     auto_sk_lab(arg_start, arg_end)
 
 # save whole model
