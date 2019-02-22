@@ -1,4 +1,5 @@
 import time
+import sys
 
 import autosklearn.classification
 import numpy as np
@@ -19,10 +20,21 @@ exclude_estimators = [
 ]
 
 
-def auto_sk_lab():
+def auto_sk_lab(start, end):
+    logger = get_logger('auto-sklearn', 'log/auto-sk/auto-sk.log')
+
     result = []
-    for (data, time_left) in data_loader.data_for_auto_sklearn():
-        result.append(auto_sk_method(data, time_left))
+    data_sets = data_loader.data_for_auto_sklearn()[start:end]
+    for (data, time_left) in data_sets():
+        logger.info('Start fitting {}'.format(data.name))
+        start = time.time()
+
+        method_result = auto_sk_method(data, time_left)
+        result.append(method_result)
+
+        logger.info('Fitting on {} is over, spend {}s\n'
+                    'result:\n'
+                    '{}'.format(data.name, time.time() - start, method_result))
 
     df_result = pd.DataFrame(data=result, columns=['data set', 'best v', 'test v'])
     df_result.to_csv('log/auto_sk/auto-sk-total.csv')
@@ -68,7 +80,9 @@ def auto_sk_method(data, time_left):
 
 
 if __name__ == '__main__':
-    auto_sk_lab()
+    arg_start = sys.argv[1]
+    arg_end = sys.argv[2]
+    auto_sk_lab(arg_start, arg_end)
 
 # save whole model
 # joblib.dump(classifier, 'log/auto_sk/auto_sk_{}.joblib'.format(data.name))
