@@ -21,7 +21,8 @@ exclude_estimators = [
 
 
 def auto_sk_lab(start, end):
-    logger = get_logger('auto-sklearn', 'log/auto_sk/auto-sk.log')
+    logger = get_logger('auto-sklearn-{}-{}'.format(start, end),
+                        'log/auto_sk/auto-sk-{}-{}.log'.format(start, end))
 
     result = []
     data_sets = data_loader.data_for_auto_sklearn()[start:end]
@@ -82,7 +83,7 @@ def auto_sk_method(data, time_left):
 if __name__ == '__main__':
     arg_start = int(sys.argv[1])
     arg_end = int(sys.argv[2])
-    auto_sk_lab(0, 4)
+    auto_sk_lab(arg_start, arg_end)
 
 # save whole model
 # joblib.dump(classifier, 'log/auto_sk/auto_sk_{}.joblib'.format(data.name))
