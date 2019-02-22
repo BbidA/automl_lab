@@ -69,7 +69,7 @@ def auto_sk_method(data, time_left):
     logger.info('Fitting on {} is done, spend {}s'.format(data.name, time.time() - start))
     logger.info('Sprint statistics\n{}'.format(classifier.sprint_statistics()))
     logger.info('Test V is {}'.format(test_v))
-    logger.info('Show model:\n{}'.format(classifier.show_models()))
+    # logger.info('Show model:\n{}'.format(classifier.show_models()))
 
     # save cv results
     cv_result = pd.DataFrame.from_dict(classifier.cv_results_)
