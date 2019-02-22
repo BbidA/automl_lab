@@ -45,8 +45,8 @@ def auto_sk_method(data, time_left):
     classifier.fit(train_x, train_y)
 
     # get best validation score
-    idx_best_run = np.argmax(classifier.cv_results['mean_test_score'])
-    best_score = classifier.cv_results['mean_test_score'][idx_best_run]
+    idx_best_run = np.argmax(classifier.cv_result_['mean_test_score'])
+    best_score = classifier.cv_results_['mean_test_score'][idx_best_run]
 
     # calculate test v
     test_x, test_y = data.test_data()
