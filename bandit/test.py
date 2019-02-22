@@ -44,6 +44,13 @@ def one_thread_lab(method):
             result.append(proposed_method(data, theta, gamma, beta))
         csv_file = 'log/proposed/proposed-{}-{}-total.csv'.format(theta, gamma)
         pkl_file = 'log/proposed/proposed-{}-{}-total.pkl'.format(theta, gamma)
+    elif method == 'ground':
+        start = int(sys.argv[2])
+        end = int(sys.argv[3])
+        for data in ALL_DATA[start:end]:
+            result.append(ground_truth_method(data))
+        csv_file = 'log/ground/ground-total-statistics-{}to{}.csv'.format(start, end)
+        pkl_file = 'log/ground/ground-total-statistics-{}to{}.pkl'.format(start, end)
     else:
         for data in ALL_DATA:
             if method == 'ucb' or method == 'random':
@@ -58,6 +65,31 @@ def one_thread_lab(method):
     df_result = pd.DataFrame(data=result, columns=['data set', 'best_v', 'best_model', 'test_v'])
     df_result.to_csv(csv_file)
     df_result.to_pickle(pkl_file)
+
+
+def ground_truth_method(data):
+    logger = get_logger('gt', 'log/ground/ground_truth.log', level=INFO)
+
+    result = []
+    budget_for_single_model = int(BUDGET / len(model_generators))
+    logger.info('Begin fitting on {}'.format(data.name))
+    start = time.time()
+
+    for model_generator in model_generators:
+        result.append(find_ground_truth(data, model_generator, budget_for_single_model))
+
+    logger.info('Fitting on {} is over, spend {}s'.format(data.name, time.time() - start))
+
+    df_result = pd.DataFrame(data=result, columns=['model', 'best v', 'mean', 'std', 'best model', 'time'])
+    df_result.to_csv('log/ground/ground_{}.csv'.format(data.name))
+
+    # get test v
+    best_model_index = df_result['best v'].idxmax()
+    best_model = df_result['best model'][best_model_index]
+    test_v = _evaluate_test_v(data, best_model)
+    logger.info('Test v of {} is {}'.format(data.name, test_v))
+
+    return data.name, df_result['best v'].max(), type(best_model).__name__, test_v
 
 
 def find_ground_truth(data, model_generator, budget=BUDGET):
@@ -91,9 +123,14 @@ def find_ground_truth(data, model_generator, budget=BUDGET):
     # begin sampling
     result = random_search(model_generator, train_x, train_y, search_times=budget)
 
-    log.info('{} --- {} end running, spend {}s'.format(data.name, model_name, time.time() - start))
+    best_result_index = result['Accuracy'].idxmax()
+    best_result_params = result['Raw Parameters'][best_result_index]
+    best_model = model_generator.generate_model(best_result_params)
+
+    elapsed = time.time() - start
+    log.info('{} --- {} end running, spend {}s'.format(data.name, model_name, elapsed))
     acc_column = result['Accuracy']
-    return model_name, acc_column.max(), acc_column.mean(), acc_column.std()
+    return model_name, acc_column.max(), acc_column.mean(), acc_column.std(), best_model, elapsed
 
 
 def ground_truth_lab():
