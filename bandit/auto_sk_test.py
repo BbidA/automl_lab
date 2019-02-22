@@ -25,7 +25,7 @@ def auto_sk_lab(start, end):
 
     result = []
     data_sets = data_loader.data_for_auto_sklearn()[start:end]
-    for (data, time_left) in data_sets():
+    for (data, time_left) in data_sets:
         logger.info('Start fitting {}'.format(data.name))
         start = time.time()
 
@@ -80,9 +80,9 @@ def auto_sk_method(data, time_left):
 
 
 if __name__ == '__main__':
-    arg_start = int(sys.argv[1])
-    arg_end = int(sys.argv[2])
-    auto_sk_lab(arg_start, arg_end)
+    # arg_start = int(sys.argv[1])
+    # arg_end = int(sys.argv[2])
+    auto_sk_lab(0, 4)
 
 # save whole model
 # joblib.dump(classifier, 'log/auto_sk/auto_sk_{}.joblib'.format(data.name))
