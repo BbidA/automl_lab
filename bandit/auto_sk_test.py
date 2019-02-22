@@ -21,7 +21,7 @@ exclude_estimators = [
 
 
 def auto_sk_lab(start, end):
-    logger = get_logger('auto-sklearn', 'log/auto-sk/auto-sk.log')
+    logger = get_logger('auto-sklearn', 'log/auto_sk/auto-sk.log')
 
     result = []
     data_sets = data_loader.data_for_auto_sklearn()[start:end]
