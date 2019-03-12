@@ -272,7 +272,6 @@ class AdaBoost(SKLearnModelGenerator):
             HyperParameter.int_param('n_estimators', (50, 500)),
             HyperParameter.float_param('learning_rate', (0.1, 2.)),
             HyperParameter.categorical_param('algorithm', ('SAMME', 'SAMME.R')),
-            HyperParameter.int_param('max_depth', (1, 10))
         ]
 
         initializer = sklearn.ensemble.AdaBoostClassifier

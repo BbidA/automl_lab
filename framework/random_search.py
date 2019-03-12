@@ -63,7 +63,7 @@ def random_search(model_generator, train_x, train_y, search_times=100):
 
 
 def random_sample_parameters(hp_space):
-    assert len(hp_space) > 0
+    assert len(hp_space) >= 0
 
     result = []
     actual_params = []

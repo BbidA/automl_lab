@@ -14,6 +14,7 @@ from logging import INFO, DEBUG
 ALL_DATA = data_loader.all_data(
     exclude=['adult', 'banknote', 'credit', 'egg', 'flag', 'seismic', 'wpbc', 'yeast', 'magic04'])
 PROPOSED_DATA = data_loader.data_for_proposed_method()
+BETA_FINDING_DATA = data_loader.data_for_beta_finding()
 
 BUDGET = 1000
 GROUND_TRUTH_PKL = 'log/ground_truth.pkl'
@@ -24,15 +25,26 @@ model_generators = [
     sk.AdaBoost(),
     sk.QuadraticDiscriminantAnalysis(),
     sk.GaussianNB(),
-    # sk.LinearSVC(),
     sk.KNeighbors(),
     sk.BernoulliNB(),
     sk.ExtraTree(),
-    # sk.MultinomialNB(),
     sk.PassiveAggressive(),
     sk.RandomForest(),
     sk.SGD()
 ]
+
+
+def parameter_test():
+    result = []
+    theta = sys.argv[1]
+    gamma = sys.argv[2]
+    for (data, beta_array) in BETA_FINDING_DATA:
+        for beta in beta_array:
+            result.append(proposed_method(data, theta, gamma, beta))
+        csv_file = 'log/proposed/find-beta--{}-{}-{}-total.csv'.format(data.name, theta, gamma)
+        df_result = pd.DataFrame(data=result, columns=['data set', 'best_v', 'best_model', 'test_v'])
+        df_result.to_csv(csv_file)
+        result.clear()
 
 
 def one_thread_lab(method):
@@ -237,6 +249,8 @@ def proposed_method(data, theta, gamma, beta, show_selection_detail=False):
     gamma: float
 
     beta: float
+
+    show_selection_detail: bool
     """
     log_name = 'proposed-{}-{}'.format(theta, gamma)
     log = get_logger(log_name, 'log/proposed/' + log_name + '.log', level=DEBUG)
@@ -366,7 +380,7 @@ def _get_test_result(best_optimization, data, statistics, csv_file, pkl_file, lo
     # save statistics to csv
     statistics.to_csv(csv_file)
     # save to pickle file for calculating exploitation rate
-    statistics.to_pickle(pkl_file)
+    # statistics.to_pickle(pkl_file)
 
     # return best_v, best_model, budget
     print(best_optimization.best_evaluation)
@@ -429,4 +443,4 @@ if __name__ == '__main__':
     # elif method_choice == 'proposed':
     #     proposed_lab()
     # proposed_method(data_loader.DataSet('messidor'), 0.01, 20, 0.65)
-    one_thread_lab(method_choice)
+    parameter_test()

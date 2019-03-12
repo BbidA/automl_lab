@@ -56,6 +56,26 @@ def data_for_proposed_method():
     ]
 
 
+def data_for_beta_finding():
+    return [
+        (DataSet('balanceScale'), [0.4, 0.45, 0.5, 0.55, 0.6]),
+        (DataSet('car'), [0.5, 0.55, 0.6, 0.65, 0.7]),
+        (DataSet('chess'), [0.5, 0.55, 0.6, 0.65, 0.7]),
+        (DataSet('cylinder'), [0.4, 0.45, 0.5, 0.55, 0.6]),
+        (DataSet('ecoli'), [0.4, 0.45, 0.5, 0.55, 0.6]),
+        (DataSet('glass'), [0.4, 0.45, 0.5, 0.55, 0.6]),
+        (DataSet('iris'), [0.6, 0.65, 0.7, 0.75, 0.8]),
+        (DataSet('messidor'), [0.4, 0.45, 0.5, 0.55, 0.6]),
+        (DataSet('mushroom'), [0.6, 0.65, 0.7, 0.75, 0.8]),
+        (DataSet('nursery'), [0.5, 0.55, 0.6, 0.65, 0.7]),
+        (DataSet('occupancy'), [0.65, 0.7, 0.75, 0.8, 0.85]),
+        (DataSet('spambase'), [0.65, 0.7, 0.75, 0.8, 0.85]),
+        (DataSet('statlogSegment'), [0.5, 0.55, 0.6, 0.65, 0.7]),
+        (DataSet('wdbc'), [0.6, 0.65, 0.7, 0.75, 0.8]),
+        (DataSet('wilt'), [0.7, 0.75, 0.8, 0.85, 0.9])
+    ]
+
+
 def data_for_auto_sklearn():
     return [
         (DataSet('balanceScale'), 37),
