@@ -116,11 +116,9 @@ class KNeighbors(SKLearnModelGenerator):
 
     def __init__(self):
         hp_space = [
-            HyperParameter.int_param('n_neighbors', (0, 50)),
+            HyperParameter.int_param('n_neighbors', (1, 100)),
             HyperParameter.categorical_param('weights', ('uniform', 'distance')),
-            HyperParameter.categorical_param('algorithm', ('ball_tree', 'kd_tree', 'brute')),
-            HyperParameter.int_param('leaf_size', (3, 100)),
-            HyperParameter.int_param('p', (1, 10))
+            HyperParameter.categorical_param('p', (1, 2))
         ]
 
         initializer = sklearn.neighbors.KNeighborsClassifier
@@ -196,14 +194,16 @@ class SGD(SKLearnModelGenerator):
     def __init__(self):
         hp_space = [
             HyperParameter.categorical_param('loss', ('hinge', 'log', 'modified_huber', 'squared_hinge', 'perceptron')),
-            HyperParameter.categorical_param('penalty', ('none', 'l2', 'l1', 'elasticnet')),
-            HyperParameter.float_param('alpha', (1e-5, 1e-3)),
+            HyperParameter.categorical_param('penalty', ('l2', 'l1', 'elasticnet')),
+            HyperParameter.float_param('alpha', (1e-9, 1)),
             HyperParameter.float_param('l1_ratio', (0.0, 1.0)),
             HyperParameter.int_param('max_iter', (1000, 10000)),
-            HyperParameter.float_param('tol', (1e-4, 1e-2)),
-            HyperParameter.categorical_param('learning_rate', ('constant', 'optimal', 'invscaling', 'adaptive')),
-            HyperParameter.float_param('eta0', (0.0, 10.0)),
-            HyperParameter.float_param('power_t', (0.05, 1))
+            HyperParameter.float_param('tol', (1e-5, 1e-1)),
+            HyperParameter.float_param('epsilon', (1e-5, 1e-1)),
+            HyperParameter.categorical_param('learning_rate', ('constant', 'optimal', 'invscaling')),
+            HyperParameter.float_param('eta0', (1e-7, 1e-1)),
+            HyperParameter.float_param('power_t', (1e-5, 1)),
+            HyperParameter.categorical_param('average', (True, False))
         ]
 
         initializer = sklearn.linear_model.SGDClassifier
@@ -228,10 +228,11 @@ class PassiveAggressive(SKLearnModelGenerator):
 
     def __init__(self):
         hp_space = [
-            HyperParameter.float_param('C', (0.1, 10)),
-            HyperParameter.int_param('max_iter', (1000, 10000)),
-            HyperParameter.float_param('tol', (1e-4, 1e-2)),
-            HyperParameter.categorical_param('loss', ('hinge', 'squared_hinge'))
+            HyperParameter.float_param('C', (1e-5, 10)),
+            HyperParameter.categorical_param('fit_intercept', (True,)),
+            HyperParameter.float_param('tol', (1e-5, 1e-1)),
+            HyperParameter.categorical_param('loss', ('hinge', 'squared_hinge')),
+            HyperParameter.categorical_param('average', (False, True))
         ]
 
         initializer = sklearn.linear_model.PassiveAggressiveClassifier
@@ -268,9 +269,10 @@ class AdaBoost(SKLearnModelGenerator):
 
     def __init__(self):
         hp_space = [
-            HyperParameter.int_param('n_estimators', (30, 500)),
+            HyperParameter.int_param('n_estimators', (50, 500)),
             HyperParameter.float_param('learning_rate', (0.1, 2.)),
-            HyperParameter.categorical_param('algorithm', ('SAMME', 'SAMME.R'))
+            HyperParameter.categorical_param('algorithm', ('SAMME', 'SAMME.R')),
+            HyperParameter.int_param('max_depth', (1, 10))
         ]
 
         initializer = sklearn.ensemble.AdaBoostClassifier
@@ -312,13 +314,12 @@ class RandomForest(SKLearnModelGenerator):
 
     def __init__(self):
         hp_space = [
-            HyperParameter.int_param('n_estimators', (10, 1000)),
-            HyperParameter.int_param('max_depth', (1, 40)),
+            HyperParameter.categorical_param('n_estimators', (100,)),
+            HyperParameter.categorical_param('criterion', ('gini', 'entropy')),
             HyperParameter.int_param('min_samples_split', (2, 20)),
             HyperParameter.int_param('min_samples_leaf', (1, 20)),
-            HyperParameter.categorical_param('max_features', ('sqrt', 'log2', None))
-            # HyperParameter.int_param('max_leaf_nodes', (-1, 100)),
-            # HyperParameter.float_param('min_impurity_decrease', (0.0, 100.0))
+            HyperParameter.float_param('max_features', (0., 1.)),
+            HyperParameter.categorical_param('bootstrap', (True, False)),
         ]
 
         initializer = sklearn.ensemble.RandomForestClassifier
@@ -330,7 +331,6 @@ class QuadraticDiscriminantAnalysis(SKLearnModelGenerator):
     def __init__(self):
         hp_space = [
             HyperParameter.float_param('reg_param', (0., 1.)),
-            HyperParameter.float_param('tol', (1e-5, 1e-3))
         ]
 
         initializer = sklearn.discriminant_analysis.QuadraticDiscriminantAnalysis
@@ -340,9 +340,7 @@ class QuadraticDiscriminantAnalysis(SKLearnModelGenerator):
 class GaussianNB(SKLearnModelGenerator):
 
     def __init__(self):
-        hp_space = [
-            HyperParameter.float_param('var_smoothing', (1e-10, 1e-8))
-        ]
+        hp_space = []
 
         initializer = sklearn.naive_bayes.GaussianNB
         super().__init__(hp_space, initializer)
@@ -353,7 +351,8 @@ class BernoulliNB(SKLearnModelGenerator):
     def __init__(self):
         hp_space = [
             HyperParameter.float_param('alpha', (1e-2, 100.0)),
-            HyperParameter.float_param('binarize', (0.0, 1.0))
+            HyperParameter.categorical_param('fit_prior', (True, False))
+            # HyperParameter.float_param('binarize', (0.0, 1.0))
         ]
 
         initializer = sklearn.naive_bayes.BernoulliNB

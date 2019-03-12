@@ -1,8 +1,7 @@
 import time
-import utils.logging_ as log
 
 import framework.sk_models as sk
-import utils.data_loader as data_loader
+import utils.logging_ as log
 from bandit.model_selection import BanditModelSelection, RandomOptimization
 from utils.data_loader import DataSet
 
