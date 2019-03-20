@@ -25,7 +25,7 @@ class RandomOptimization:
         self.mu = 0
         self.sigma = 0
 
-        # Mean of the sum of the squares of evaluation result
+        # 其实就是 X 的平方的均值，名字取得有点问题
         self.square_mean = 0
 
         # Parameter change record

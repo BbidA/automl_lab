@@ -36,8 +36,8 @@ model_generators = [
 
 def parameter_test():
     result = []
-    theta = sys.argv[1]
-    gamma = sys.argv[2]
+    theta = float(sys.argv[1])
+    gamma = float(sys.argv[2])
     for (data, beta_array) in BETA_FINDING_DATA:
         for beta in beta_array:
             result.append(proposed_method(data, theta, gamma, beta))
