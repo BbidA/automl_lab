@@ -23,7 +23,7 @@ CORES = 1  # one thread see function one_thread_lab(method)
 model_generators = [
     sk.DecisionTree(),
     sk.AdaBoost(),
-    sk.QuadraticDiscriminantAnalysis(),
+    # sk.QuadraticDiscriminantAnalysis(),
     sk.GaussianNB(),
     sk.KNeighbors(),
     sk.BernoulliNB(),
@@ -146,33 +146,25 @@ def find_ground_truth(data, model_generator, budget=BUDGET):
 
 
 def ground_truth_lab():
-    statistics = []
-    ground_truth_model = {}
     log = get_logger('gt', 'log/gt.log', level=INFO)
     for data in ALL_DATA:
         start = time.time()
         log.info('Start finding ground truth model for data set {}'.format(data.name))
 
-        with mp.Pool(processes=CORES) as pool:
-            result = pool.starmap(find_ground_truth, [(data, generator) for generator in model_generators])
-            data_frame = pd.DataFrame(data=result, columns=['name', 'max', 'mean', 'std'])
-            data_frame = data_frame.set_index(data_frame['name']).drop(['name'], axis=1)
+        result = []
+        for generator in model_generators:
+            result.append(find_ground_truth(data, generator))
+        df_result = pd.DataFrame(data=result, columns=['name', 'max', 'mean', 'std', 'best_model', 'time'])
+        df_result = df_result.set_index(df_result['name'])
+        best_model = df_result['max'].idxmax()
 
-            statistics.append((data.name, data_frame))
-
-            best_model = data_frame['max'].idxmax()
-            ground_truth_model[data.name] = best_model
-
-            # save to csv
-            with open('log/gt_{}.csv'.format(data.name), 'a') as f:
-                f.write('best is {}\n'.format(best_model))
-                data_frame.to_csv(f, mode='a')
+        # save to csv
+        with open('log/gt_{}.csv'.format(data.name), 'a') as f:
+            f.write('best is {}\n'.format(best_model))
+            df_result.to_csv(f, mode='a')
 
         elapsed = time.time() - start
         log.info('g-test --- Fitting on {} is over, spend {}s'.format(data.name, elapsed))
-
-    with open(GROUND_TRUTH_PKL, 'wb') as f:
-        pickle.dump(ground_truth_model, f)
 
 
 def ucb_lab(method):
@@ -443,4 +435,12 @@ if __name__ == '__main__':
     # elif method_choice == 'proposed':
     #     proposed_lab()
     # proposed_method(data_loader.DataSet('messidor'), 0.01, 20, 0.65)
-    parameter_test()
+    # parameter_test()
+    # nursery_data_set = data_loader.DataSet('nursery')
+    # t_x, t_y = nursery_data_set.train_data()
+    #
+    # print(t_x[0:10])
+    # print(t_y[0:10])
+    # qda = sk.QuadraticDiscriminantAnalysis()
+    # random_search(qda, t_x, t_y, search_times=10)
+    ground_truth_lab()
