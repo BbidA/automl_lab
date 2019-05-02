@@ -38,41 +38,32 @@ def all_data(include=None, exclude=None):
 
 def data_for_proposed_method():
     return [
-        (DataSet('balanceScale'), 0.5),
-        (DataSet('car'), 0.6),
-        (DataSet('chess'), 0.6),
-        (DataSet('cylinder'), 0.5),
-        (DataSet('ecoli'), 0.5),
-        (DataSet('glass'), 0.5),
-        (DataSet('iris'), 0.7),
-        (DataSet('messidor'), 0.5),
-        (DataSet('mushroom'), 0.7),
-        (DataSet('nursery'), 0.6),
-        (DataSet('occupancy'), 0.8),
-        (DataSet('spambase'), 0.75),
-        (DataSet('statlogSegment'), 0.6),
-        (DataSet('wdbc'), 0.7),
-        (DataSet('wilt'), 0.9)
+        (DataSet('balanceScale'), 0.366),
+        (DataSet('ecoli'), 0.41200000000000003),
+        (DataSet('cylinder'), 0.492),
+        (DataSet('glass'), 0.432),
+        (DataSet('messidor'), 0.45499999999999996),
+        (DataSet('car'), 0.584),
+        (DataSet('chess'), 0.536),
+        (DataSet('wilt'), 0.7949999999999999),
+        (DataSet('nursery'), 0.44099999999999995)
     ]
 
 
 def data_for_beta_finding():
     return [
-        (DataSet('balanceScale'), [0.4, 0.45, 0.5, 0.55, 0.6]),
-        (DataSet('car'), [0.5, 0.55, 0.6, 0.65, 0.7]),
-        (DataSet('chess'), [0.5, 0.55, 0.6, 0.65, 0.7]),
-        (DataSet('cylinder'), [0.4, 0.45, 0.5, 0.55, 0.6]),
-        (DataSet('ecoli'), [0.4, 0.45, 0.5, 0.55, 0.6]),
-        (DataSet('glass'), [0.4, 0.45, 0.5, 0.55, 0.6]),
-        (DataSet('iris'), [0.6, 0.65, 0.7, 0.75, 0.8]),
-        (DataSet('messidor'), [0.4, 0.45, 0.5, 0.55, 0.6]),
-        (DataSet('mushroom'), [0.6, 0.65, 0.7, 0.75, 0.8]),
-        (DataSet('nursery'), [0.5, 0.55, 0.6, 0.65, 0.7]),
-        (DataSet('occupancy'), [0.65, 0.7, 0.75, 0.8, 0.85]),
-        (DataSet('spambase'), [0.65, 0.7, 0.75, 0.8, 0.85]),
-        (DataSet('statlogSegment'), [0.5, 0.55, 0.6, 0.65, 0.7]),
-        (DataSet('wdbc'), [0.6, 0.65, 0.7, 0.75, 0.8]),
-        (DataSet('wilt'), [0.7, 0.75, 0.8, 0.85, 0.9])
+        (DataSet('balanceScale'), _get_betas(0.35, 0.75)),
+        (DataSet('car'), _get_betas(0.5, 0.7)),
+        (DataSet('chess'), _get_betas(0.5, 0.7)),
+        (DataSet('cylinder'), _get_betas(0.4, 0.6)),
+        (DataSet('ecoli'), _get_betas(0.4, 0.6)),
+        (DataSet('glass'), _get_betas(0.4, 0.6)),
+        (DataSet('messidor'), _get_betas(0.4, 0.6)),
+        (DataSet('nursery'), _get_betas(0.5, 0.7)),
+        (DataSet('spambase'), _get_betas(0.65, 0.85)),
+        (DataSet('statlogSegment'), _get_betas(0.5, 0.7)),
+        (DataSet('wdbc'), _get_betas(0.6, 0.8)),
+        (DataSet('wilt'), _get_betas(0.7, 0.9))
     ]
 
 
@@ -135,6 +126,10 @@ def _find(name, path):
 def _read_data(file_name):
     path = os.path.join(curr_path, '../temp_dataset')
     return dataset_reader(_find(file_name, path))
+
+
+def _get_betas(start, end, steps=50):
+    return [start + (end - start) * i / steps for i in range(steps)]
 
 
 class DataSet:

@@ -38,7 +38,9 @@ def parameter_test():
     result = []
     theta = float(sys.argv[1])
     gamma = float(sys.argv[2])
-    for (data, beta_array) in BETA_FINDING_DATA:
+    begin = int(sys.argv[3])
+    end = int(sys.argv[4])
+    for (data, beta_array) in BETA_FINDING_DATA[begin:end]:
         for beta in beta_array:
             result.append(proposed_method(data, theta, gamma, beta))
         csv_file = 'log/proposed/find-beta--{}-{}-{}-total.csv'.format(data.name, theta, gamma)
@@ -50,12 +52,12 @@ def parameter_test():
 def one_thread_lab(method):
     result = []
     if method == 'proposed':
-        theta = sys.argv[2]
-        gamma = sys.argv[3]
+        theta = 0.01
+        gamma = 20.0
         for (data, beta) in PROPOSED_DATA:
             result.append(proposed_method(data, theta, gamma, beta))
-        csv_file = 'log/proposed/proposed-{}-{}-total.csv'.format(theta, gamma)
-        pkl_file = 'log/proposed/proposed-{}-{}-total.pkl'.format(theta, gamma)
+        csv_file = 'log/proposed-new/proposed-{}-{}-total.csv'.format(theta, gamma)
+        pkl_file = 'log/proposed-new/proposed-{}-{}-total.pkl'.format(theta, gamma)
     elif method == 'ground':
         start = int(sys.argv[2])
         end = int(sys.argv[3])
@@ -76,7 +78,7 @@ def one_thread_lab(method):
 
     df_result = pd.DataFrame(data=result, columns=['data set', 'best_v', 'best_model', 'test_v'])
     df_result.to_csv(csv_file)
-    df_result.to_pickle(pkl_file)
+    # df_result.to_pickle(pkl_file)
 
 
 def ground_truth_method(data):
@@ -245,7 +247,7 @@ def proposed_method(data, theta, gamma, beta, show_selection_detail=False):
     show_selection_detail: bool
     """
     log_name = 'proposed-{}-{}'.format(theta, gamma)
-    log = get_logger(log_name, 'log/proposed/' + log_name + '.log', level=DEBUG)
+    log = get_logger(log_name, 'log/proposed-new/' + log_name + '.log', level=DEBUG)
 
     optimizations = _get_optimizations()
     model_selection = BanditModelSelection(optimizations, 'new', theta=theta, gamma=gamma, beta=beta)
@@ -269,8 +271,8 @@ def proposed_method(data, theta, gamma, beta, show_selection_detail=False):
 
     log.info('Fitting on {} is over, spend {}s'.format(data.name, time.time() - start))
 
-    csv_file = 'log/proposed/proposed_{}_{}_{}_{}.csv'.format(theta, gamma, beta, data.name)
-    pkl_file = 'log/proposed/proposed_{}_{}_{}_{}.pkl'.format(theta, gamma, beta, data.name)
+    csv_file = 'log/proposed-new/proposed_{}_{}_{}_{}.csv'.format(theta, gamma, beta, data.name)
+    pkl_file = 'log/proposed-new/proposed_{}_{}_{}_{}.pkl'.format(theta, gamma, beta, data.name)
 
     return _get_test_result(best_optimization, data, model_selection.statistics(), csv_file, pkl_file, log)
 
@@ -421,7 +423,7 @@ def _evaluate_test_v(data, model):
 
 
 if __name__ == '__main__':
-    method_choice = sys.argv[1]
+    # method_choice = sys.argv[1]
     # if method_choice == 'ground':
     #     ground_truth_lab()
     # elif method_choice == 'ucb':
@@ -443,4 +445,6 @@ if __name__ == '__main__':
     # print(t_y[0:10])
     # qda = sk.QuadraticDiscriminantAnalysis()
     # random_search(qda, t_x, t_y, search_times=10)
-    ground_truth_lab()
+    # ground_truth_lab()
+    method = sys.argv[1]
+    one_thread_lab(method)
