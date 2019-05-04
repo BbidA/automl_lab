@@ -2,7 +2,8 @@ import time
 
 import framework.sk_models as sk
 import utils.logging_ as log
-from bandit.model_selection import BanditModelSelection, RandomOptimization
+from bandit.model_selection import BanditModelSelection
+from bandit.model_optimization import RandomOptimization
 from utils.data_loader import DataSet
 
 logger = log.LoggerManager.get_logger('random')

@@ -1,98 +1,13 @@
 import abc
+import logging
+import random
 
 import numpy as np
 import pandas as pd
 
-from framework.random_search import random_search
-import random
-import logging
+from bandit.model_optimization import RandomOptimization
 
 EVALUATION_CRITERIA = 'Accuracy'
-
-
-class RandomOptimization:
-
-    def __init__(self, model_generator, name=None):
-        self.model_generator = model_generator
-        self.name = name
-        self.count = 0
-        self.time_out_count = 0
-
-        # Evaluation results
-        self.instances = pd.DataFrame(columns=['Raw Parameters', 'Actual Parameters', 'Accuracy', 'Time'])
-
-        # Gaussian parameters
-        self.mu = 0
-        self.sigma = 0
-
-        # 其实就是 X 的平方的均值，名字取得有点问题
-        self.square_mean = 0
-
-        # Parameter change record
-        self.param_change_info = []
-
-    def __str__(self):
-        return 'Model {}\nBudget: {}\nTimeout count: {}\n======Best result======:\n {}\n============\n' \
-               'Gaussian mu: {}\nGaussian sigma: {}\nmu_Y: {}'.format(self.name, self.count, self.time_out_count,
-                                                                      self.best_evaluation, self.mu, self.sigma,
-                                                                      self.square_mean)
-
-    @property
-    def best_evaluation(self):
-        if self.instances.empty:
-            return pd.Series(data=[0], index=['Accuracy'])
-        return self.instances.sort_values(by=EVALUATION_CRITERIA, ascending=False).iloc[0]
-
-    @property
-    def best_model(self):
-        best_params = self.best_evaluation['Raw Parameters']
-        return self.model_generator.generate_model(best_params)
-
-    def run_one_step(self, train_x, train_y, beta=0):
-        evaluation_result = random_search(self.model_generator, train_x, train_y, search_times=1)
-
-        while evaluation_result.empty:
-            # The result is empty because some errors like timeout occurred
-            self.time_out_count += 1
-            evaluation_result = random_search(self.model_generator, train_x, train_y, search_times=1)
-
-        self.instances = self.instances.append(evaluation_result, ignore_index=True)
-
-        # update count
-        previous_count = self.count
-        self.count += 1
-
-        eval_value = evaluation_result[EVALUATION_CRITERIA].values[0]
-        self._update_parameter(previous_count, eval_value, beta)
-
-    def clear(self):
-        self.count = 0
-        self.time_out_count = 0
-
-        self.instances = pd.DataFrame()
-
-        self.mu = 0
-        self.sigma = 0
-
-        self.square_mean = 0
-
-        self.param_change_info = []
-
-    def _update_parameter(self, previous_count, new_eval_result, beta):
-        """Update parameters of this optimization after one step
-
-        Parameters
-        ----------
-
-        beta : float
-            bias minus from mu
-
-        """
-        new_eval_result = new_eval_result - beta
-
-        self.mu = (previous_count * self.mu + new_eval_result) / (previous_count + 1)
-        self.sigma = self.instances[EVALUATION_CRITERIA].std()
-        self.square_mean = (previous_count * self.square_mean + new_eval_result ** 2) / (previous_count + 1)
 
 
 def _new_func(optimization, t, theta=1, record=None, gamma=1):
@@ -166,6 +81,40 @@ class ModelSelection:
         return logger
 
 
+class ERUCB(ModelSelection):
+    def __init__(self, optimizations, b1=1, b2=1, c1=1, c2=1, alpha=1.0 / 3):
+        super().__init__(optimizations)
+        self.b1 = b1
+        self.b2 = b2
+        self.c1 = c1
+        self.c2 = c2
+        self.alpha = alpha
+
+    def fit(self, train_x, train_y, budget=200):
+        # Initializing models
+        self._logger.info("Initialization")
+        consumption = self._init_models(budget)
+        self._logger.info("Initialization Done")
+
+        # do model selection
+        for i in range(consumption, budget):
+            self._logger.info("Process: {}/{}".format(i + 1, budget))
+            next_model = self._next_selection()
+            next_model.run_one_step(train_x, train_y, i + 1)
+
+        return self._best_selection()
+
+    def _init_models(self, init_times=3):
+        for o in self.optimizations:
+            for _ in range(init_times):
+                o.run_one_step()
+        return init_times * len(self.optimizations)
+
+    def _next_selection(self):
+        values = [r.selection_value() for r in self.optimizations]
+        return self.optimizations[np.argmax(values)]
+
+
 class BanditModelSelection(ModelSelection):
     _update_functions = ['new', 'ucb', 'random']
 
@@ -194,7 +143,7 @@ class BanditModelSelection(ModelSelection):
         Returns
         -------
 
-        result: RandomOptimization
+        result: bandit.model_optimization.RandomOptimization
             best model
 
         """

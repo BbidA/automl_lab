@@ -112,6 +112,12 @@ class ModelGenerator:
     def generate_model(self, param_values):
         return
 
+    def retrieve_actual_params(self, raw_params):
+        actual_params = []
+        for hp, raw_param in zip(self.hp_space, raw_params):
+            actual_params.append(hp.convert_raw_param(raw_param))
+        return actual_params
+
 
 class HyperParameter:
 

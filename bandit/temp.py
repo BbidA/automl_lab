@@ -5,7 +5,7 @@ import pandas as pd
 from scipy.stats import norm, gamma
 
 import framework.sk_models as sk
-from framework.random_search import random_search
+from framework.param_search import random_search
 from utils import data_loader
 from bandit.model_selection import ModelSelection
 

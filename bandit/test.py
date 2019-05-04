@@ -1,9 +1,10 @@
 import time
 
 import framework.sk_models as sk
-from framework.random_search import random_search
+from framework.param_search import random_search
 import utils.data_loader as data_loader
-from bandit.model_selection import BanditModelSelection, RandomOptimization, EpsilonGreedySelection, SoftMaxSelection
+from bandit.model_selection import BanditModelSelection, EpsilonGreedySelection, SoftMaxSelection
+from bandit.model_optimization import RandomOptimization
 from utils.logging_ import get_logger
 import sys
 import multiprocessing as mp
