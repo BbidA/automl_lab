@@ -14,7 +14,7 @@ _data_betas = {
     # 'cylinder': _get_betas(0.4, 0.6),
     # 'glass': _get_betas(0.4, 0.6),
     # 'messidor': _get_betas(0.35, 0.7),
-    # 'car': _get_betas(0.5, 0.7),
+    # 'car': _get_betas(0.  5, 0.7),
     # 'chess': _get_betas(0.5, 0.7),
     # 'spambase': _get_betas(0.65, 0.85),
     # 'statlogSegment': _get_betas(0.5, 0.7),

@@ -3,8 +3,8 @@ import time
 import framework.sk_models as sk
 from framework.param_search import random_search
 import utils.data_loader as data_loader
-from bandit.model_selection import BanditModelSelection, EpsilonGreedySelection, SoftMaxSelection
-from bandit.model_optimization import RandomOptimization
+from bandit.model_selection import BanditModelSelection, EpsilonGreedySelection, SoftMaxSelection, ERUCB
+from bandit.model_optimization import RandomOptimization, RacosOptimization
 from utils.logging_ import get_logger
 import sys
 import multiprocessing as mp
@@ -17,14 +17,14 @@ ALL_DATA = data_loader.all_data(
 PROPOSED_DATA = data_loader.data_for_proposed_method()
 BETA_FINDING_DATA = data_loader.data_for_beta_finding()
 
-BUDGET = 1000
+BUDGET = 100
+B = 0.001
 GROUND_TRUTH_PKL = 'log/ground_truth.pkl'
 CORES = 1  # one thread see function one_thread_lab(method)
 
 model_generators = [
     sk.DecisionTree(),
     sk.AdaBoost(),
-    # sk.QuadraticDiscriminantAnalysis(),
     sk.GaussianNB(),
     sk.KNeighbors(),
     sk.BernoulliNB(),
@@ -58,16 +58,18 @@ def one_thread_lab(method):
         for (data, beta) in PROPOSED_DATA:
             result.append(proposed_method(data, theta, gamma, beta))
         csv_file = 'log/proposed-new/proposed-{}-{}-total.csv'.format(theta, gamma)
-        pkl_file = 'log/proposed-new/proposed-{}-{}-total.pkl'.format(theta, gamma)
+    elif method == 'new_er':
+        for (data, _) in PROPOSED_DATA:
+            result.append(new_erucb_method(data))
+        csv_file = 'log/proposed-new/new-er-total.csv'
     elif method == 'ground':
         start = int(sys.argv[2])
         end = int(sys.argv[3])
         for data in ALL_DATA[start:end]:
             result.append(ground_truth_method(data))
         csv_file = 'log/ground/ground-total-statistics-{}to{}.csv'.format(start, end)
-        pkl_file = 'log/ground/ground-total-statistics-{}to{}.pkl'.format(start, end)
     else:
-        for data in ALL_DATA:
+        for (data, _) in PROPOSED_DATA:
             if method == 'ucb' or method == 'random':
                 result.append(ucb_or_random_method(data, method))
             elif method == 'eg':
@@ -75,11 +77,9 @@ def one_thread_lab(method):
             elif method == 'sf':
                 result.append(softmax_method(data))
         csv_file = 'log/{}/{}-total-statistics.csv'.format(method, method)
-        pkl_file = 'log/{}/{}-total-statistics.pkl'.format(method, method)
 
     df_result = pd.DataFrame(data=result, columns=['data set', 'best_v', 'best_model', 'test_v'])
     df_result.to_csv(csv_file)
-    # df_result.to_pickle(pkl_file)
 
 
 def ground_truth_method(data):
@@ -229,6 +229,30 @@ def proposed_lab():
         df_result = pd.DataFrame(data=result, columns=['data set', 'best_v', 'best_model', 'test_v'])
         df_result.to_csv('log/proposed/proposed_{}_{}.csv'.format(theta, gamma))
         df_result.to_pickle('log/proposed/proposed_{}_{}.pkl'.format(theta, gamma))
+
+
+def new_erucb_method(data, b=B):
+    log_name = 'new-erucb'
+    log = get_logger(log_name, 'log/proposed-new/' + log_name + '.log', level=DEBUG)
+
+    model_selection = _get_model_selection(b)
+
+    log.info('Begin fit on {}'.format(data.name))
+    train_x, train_y = data.train_data()
+    start = time.time()
+
+    best_optimization = model_selection.fit(train_x, train_y, budget=BUDGET)
+
+    elapsed = time.time() - start
+    log.info('Fitting on {} ends, spend {}s'.format(data.name, elapsed))
+    for (prefix, param_info) in model_selection.param_change_info:
+        assert isinstance(param_info, pd.DataFrame)
+        with open('log/proposed-new/erucb-process-{}-{}.csv'.format(data.name, b), mode='a') as f:
+            f.write(prefix)
+            param_info.to_csv(f, mode='a')
+
+    csv = 'log/proposed-new/new_erucb_{}_{}.csv'.format(data.name, b)
+    return _get_test_result(best_optimization, data, model_selection.statistics(), csv, '', log)
 
 
 def proposed_method(data, theta, gamma, beta, show_selection_detail=False):
@@ -394,8 +418,14 @@ def _get_test_result(best_optimization, data, statistics, csv_file, pkl_file, lo
     return data.name, best_v, best_model, test_v
 
 
-def _get_optimizations():
-    return [RandomOptimization(generator, type(generator).__name__) for generator in model_generators]
+def _get_optimizations(b=B):
+    return [RacosOptimization(generator, type(generator).__name__, b1=b, b2=b) for generator in
+            model_generators]
+
+
+def _get_model_selection(b=B):
+    optimizations = _get_optimizations(b)
+    return ERUCB(optimizations)
 
 
 def _evaluate_test_v(data, model):
@@ -447,5 +477,5 @@ if __name__ == '__main__':
     # qda = sk.QuadraticDiscriminantAnalysis()
     # random_search(qda, t_x, t_y, search_times=10)
     # ground_truth_lab()
-    method = sys.argv[1]
-    one_thread_lab(method)
+    m_opt = sys.argv[1]
+    one_thread_lab(m_opt)

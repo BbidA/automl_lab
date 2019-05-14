@@ -339,7 +339,9 @@ class QuadraticDiscriminantAnalysis(SKLearnModelGenerator):
 class GaussianNB(SKLearnModelGenerator):
 
     def __init__(self):
-        hp_space = []
+        hp_space = [
+            HyperParameter.float_param('var_smoothing', (1e-10, 1e-8))
+        ]
 
         initializer = sklearn.naive_bayes.GaussianNB
         super().__init__(hp_space, initializer)

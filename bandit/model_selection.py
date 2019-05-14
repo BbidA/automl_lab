@@ -5,12 +5,10 @@ import random
 import numpy as np
 import pandas as pd
 
-from bandit.model_optimization import RandomOptimization
-
 EVALUATION_CRITERIA = 'Accuracy'
 
 
-def _new_func(optimization, t, theta=1, record=None, gamma=1):
+def _new_func(optimization, t, theta=1.0, record=None, gamma=1):
     third_term = np.sqrt(2 * np.log(t) / optimization.count)
     forth_term = np.sqrt(1 / theta * third_term)
     second_term = np.sqrt(1 / theta * optimization.square_mean)
@@ -82,43 +80,77 @@ class ModelSelection:
 
 
 class ERUCB(ModelSelection):
-    def __init__(self, optimizations, b1=1, b2=1, c1=1, c2=1, alpha=1.0 / 3):
+    def __init__(self, optimizations, theta=0.01):
         super().__init__(optimizations)
-        self.b1 = b1
-        self.b2 = b2
-        self.c1 = c1
-        self.c2 = c2
-        self.alpha = alpha
+        self.theta = theta
+        self.param_change_info = []
+        self.columns = ['name', 'count', 'beta1', 'beta0', 'e_beta0', 'e_beta1', 'e_variance',
+                        'sigma', 'func_m', 'func_n', '1/t^alpha', 'e_beta0_inside_ppf',
+                        'e_beta1_inside_ppf', 'e_beta0_item3', 'muY_kt', 'delta_t', 'sqrt(1/theta*variance)',
+                        'last_item', 'selection_value']
 
     def fit(self, train_x, train_y, budget=200):
         # Initializing models
         self._logger.info("Initialization")
-        consumption = self._init_models(budget)
+        consumption = self._init_models(train_x, train_y) - 1
         self._logger.info("Initialization Done")
 
         # do model selection
-        for i in range(consumption, budget):
-            self._logger.info("Process: {}/{}".format(i + 1, budget))
-            next_model = self._next_selection()
-            next_model.run_one_step(train_x, train_y, i + 1)
+        while consumption < budget:
+            self._logger.info("Process: {}/{}".format(consumption + 1, budget))
+            selection_values = [o.selection_value(consumption + 1, self.theta) for o in self.optimizations]
+
+            if np.isnan(selection_values).any():
+                for (value, o) in zip(selection_values, self.optimizations):
+                    if np.isnan(value):
+                        while consumption < budget and np.isnan(value):
+                            self._logger.info('Selection value of {} is nan, rerunning: {}/{}'
+                                              .format(o.name, consumption + 1, budget))
+                            self._update_param_info(consumption + 1, prefix='rerun {} '.format(o.name))
+
+                            o.run_one_step(train_x, train_y)
+                            consumption += 1
+                            value = o.selection_value(consumption + 1, self.theta)
+
+                        if consumption >= budget:
+                            return self._best_selection()
+
+                selection_values = [o.selection_value(consumption + 1, self.theta) for o in self.optimizations]
+                assert not np.isnan(selection_values).any()
+
+            next_model = self.optimizations[np.argmax(selection_values)]
+            self._update_param_info(consumption + 1, prefix='Select {} '.format(next_model.name))
+            next_model.run_one_step(train_x, train_y)
+            consumption += 1
 
         return self._best_selection()
 
-    def _init_models(self, init_times=3):
-        for o in self.optimizations:
-            for _ in range(init_times):
-                o.run_one_step()
-        return init_times * len(self.optimizations)
+    def _update_param_info(self, t, prefix=''):
+        param_info = [o.param_info(t, self.theta) for o in self.optimizations]
+        self.param_change_info.append(('{}t={}'.format(prefix, t),
+                                       pd.DataFrame(data=param_info, columns=self.columns)))
 
-    def _next_selection(self):
-        values = [r.selection_value() for r in self.optimizations]
-        return self.optimizations[np.argmax(values)]
+    def statistics(self):
+        data = [(o.name, o.beta0, o.beta1, o.variance, o.count, o.best_evaluation[EVALUATION_CRITERIA]) for o in
+                self.optimizations]
+        return pd.DataFrame(data=data, columns=['name', 'beta0', 'beta1', 'variance', 'budget', 'best v'])
+
+    def _init_models(self, train_x, train_y, init_times=3):
+        count = 1
+        total_count = len(self.optimizations) * init_times
+        for o in self.optimizations:
+            self._logger.info('Initializing {}'.format(o.name))
+            for _ in range(init_times):
+                self._logger.info('Init {}/{}'.format(count, total_count))
+                count += 1
+                o.run_one_step(train_x, train_y)
+        return count
 
 
 class BanditModelSelection(ModelSelection):
     _update_functions = ['new', 'ucb', 'random']
 
-    def __init__(self, optimizations, update_func='new', theta=1, gamma=1, beta=0):
+    def __init__(self, optimizations, update_func='new', theta=0.01, gamma=20, beta=0):
         super().__init__(optimizations)
         self.param_change_info = []
         self.theta = theta
@@ -152,9 +184,12 @@ class BanditModelSelection(ModelSelection):
         self._init_each_optimizations(train_x, train_y, beta=self.beta)
 
         for t in range(len(self.optimizations) + 1, budget + 1):
-            self._logger.debug('Process: {} / budget'.format(t))
+            self._logger.debug('Process: {} / {}'.format(t, budget))
             next_model = self._next_selection(t)
-            next_model.run_one_step(train_x, train_y, beta=self.beta)
+            if self.update_func == 'new':
+                next_model.run_one_step(train_x, train_y, beta=self.beta)
+            else:
+                next_model.run_one_step(train_x, train_y)
 
         return self._best_selection()
 
@@ -177,7 +212,10 @@ class BanditModelSelection(ModelSelection):
     def _init_each_optimizations(self, train_x, train_y, beta):
         for optimization in self.optimizations:
             optimization.clear()  # clear history data
-            optimization.run_one_step(train_x, train_y, beta=beta)
+            if self.update_func == 'new':
+                optimization.run_one_step(train_x, train_y, beta=beta)
+            else:
+                optimization.run_one_step(train_x, train_y)
 
     def _next_selection(self, current_count):
         selection_record = []  # used to record values of the terms of the equation for each models
@@ -215,7 +253,6 @@ class EpsilonGreedySelection(ModelSelection):
                 max_items = np.argwhere(values == values.max())
                 max_item = random.choice(max_items.reshape(max_items.shape[0]))
                 selection = self.optimizations[max_item]
-            assert isinstance(selection, RandomOptimization)
 
             selection.run_one_step(train_x, train_y)
 

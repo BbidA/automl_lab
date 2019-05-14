@@ -46,7 +46,10 @@ def data_for_proposed_method():
         (DataSet('car'), 0.584),
         (DataSet('chess'), 0.536),
         (DataSet('wilt'), 0.7949999999999999),
-        (DataSet('nursery'), 0.44099999999999995)
+        (DataSet('nursery'), 0.44099999999999995),
+        (DataSet('spambase'), 0.6900000000000001),
+        (DataSet('statlogSegment'), 0.6599999999999999),
+        (DataSet('wdbc'), 0.604)
     ]
 
 
