@@ -28,7 +28,7 @@ model_generators = [
     sk.GaussianNB(),
     sk.KNeighbors(),
     sk.BernoulliNB(),
-    sk.ExtraTree(),
+    sk.ExtraTrees(),
     sk.PassiveAggressive(),
     sk.RandomForest(),
     sk.SGD()
