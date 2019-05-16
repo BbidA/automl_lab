@@ -103,7 +103,6 @@ class ProposedMethodArm(Optimization):
 
         # update variance
         y_hat = [self.beta1 * i + self.beta0 for i in range(1, self.count + 1)]
-        print('y_hat is {}, y is {}'.format(y_hat, self.eval_results[-1]))
         self._update_variance(y_hat)
 
     def _update_variance(self, y_hat):
@@ -156,7 +155,7 @@ class ProposedMethodArm(Optimization):
         return (self.count + 1) / 2
 
 
-def artificial_test():
+def artificial_test(method):
     arms = [
         Arm(1, 10, 0, 1),
         Arm(2, 1, 0, 1),
@@ -164,19 +163,27 @@ def artificial_test():
     ]
 
     optimizations = [ProposedMethodArm(a, a.name, 0.01, 0.01) for a in arms]
-    model_selection = ERUCB(optimizations)
 
-    best_optimization = model_selection.fit(None, None, 200)
+    if method == 'new_er':
+        model_selection = ERUCB(optimizations)
+    elif method == 'sf':
+        model_selection = SoftMaxSelection(optimizations)
+    elif method == 'eg':
+        model_selection = EpsilonGreedySelection(optimizations)
+    elif method == 'ucb':
+        model_selection = BanditModelSelection(optimizations, 'ucb')
+    else:
+        raise ValueError('Wrong method')
 
-    # for (prefix, param_info) in model_selection.param_change_info:
-    #     assert isinstance(param_info, pd.DataFrame)
-    #     with open('log/arm-process.csv', mode='a') as f:
-    #         f.write(prefix)
-    #         param_info.to_csv(f, mode='a')
+    best_optimization = model_selection.fit(None, None, 2000)
 
-    model_selection.statistics().to_csv('log/arm.csv')
-    print(best_optimization.instances['Accuracy'].var())
+    for (prefix, param_info) in model_selection.param_change_info:
+        assert isinstance(param_info, pd.DataFrame)
+        with open('log/arm-process-newer.csv', mode='a') as f:
+            f.write(prefix)
+            param_info.to_csv(f, mode='a')
+    model_selection.statistics().to_csv('log/arm-{}.csv'.format(method))
 
 
 if __name__ == '__main__':
-    artificial_test()
+    artificial_test('new_er')
