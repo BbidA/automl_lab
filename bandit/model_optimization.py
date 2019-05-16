@@ -139,7 +139,7 @@ class RacosOptimization(Optimization):
         self.beta1, self.beta0, *_ = stats.linregress(range(1, self.count + 1), self.inverse_eval)
 
         # update variance
-        y_hat = self.function_g(self.beta1 * self.count + self.beta0)
+        y_hat = [self.function_g(self.beta1 * i + self.beta0) for i in range(1, self.count + 1)]
         self._update_variance(y_hat)
 
     def _init_racos(self):
@@ -193,7 +193,8 @@ class RacosOptimization(Optimization):
         self._e_beta0_item3 = item3
 
     def _update_e_variance(self, t):
-        self.e_variance = (self.count * self.e_beta1 + self.e_beta0 + 1) * np.sqrt(2 * np.log(t) / self.count)
+        self.e_variance = (self.count * self.e_beta1 + self.e_beta0 + 1) * \
+                          np.sqrt(self.alpha * np.log(t) / (2 * self.count))
 
     def _func_m(self, n):
         assert len(self.inverse_eval) == n
@@ -201,8 +202,8 @@ class RacosOptimization(Optimization):
         item1 = self.b1 / ((self.variance * _func_a(n)) ** 1.5)
         x_hat = self._x_hat()
         seq_i = np.arange(1, n + 1)
-        item2 = (abs(seq_i - x_hat) ** 3) * (
-                abs(np.asarray(self.inverse_eval) - (seq_i * self.beta1 + self.beta0)) ** 3)
+        item2 = (abs(seq_i - x_hat) ** 3) * \
+                (abs(np.asarray(self.inverse_eval) - (seq_i * self.beta1 + self.beta0)) ** 3)
         return item1 * item2.sum()
 
     def _func_n(self, n):

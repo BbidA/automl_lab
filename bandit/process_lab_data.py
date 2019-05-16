@@ -1,5 +1,16 @@
+import ast
+import os
+
+import numpy as np
 import pandas as pd
 import pylab
+from sklearn.metrics import accuracy_score
+from sklearn.model_selection import StratifiedKFold
+from sklearn.tree import DecisionTreeClassifier
+
+import framework.sk_models as sk
+from framework.base import data_collector
+from utils.data_loader import DataSet
 
 ROOT_PATH = '/Users/jundaliao/Desktop/AutoML Log/proposed0420/'
 
@@ -22,6 +33,18 @@ _data_betas = {
     # 'wilt': _get_betas(0.7, 0.95),
     'nursery': _get_betas(0.45, 0.55)
     # 'nursery': _get_betas(0.45, 0.55)
+}
+
+models = {
+    'adaboost': sk.AdaBoost(),
+    'extratrees': sk.ExtraTree(),
+    'randomforest': sk.RandomForest(),
+    'decisiontree': sk.DecisionTree(),
+    'gaussiannb': sk.GaussianNB(),
+    'bernoullinb': sk.BernoulliNB(),
+    'sgd': sk.SGD(),
+    'knearestneighbors': sk.KNeighbors(),
+    'passiveaggressive': sk.PassiveAggressive()
 }
 
 _ground_truth_models = {
@@ -53,6 +76,11 @@ _betas = {
     'statlogSegment': 0.6599999999999999,
     'wdbc': 0.604
 }
+
+
+def underscore_to_camelcase(value: str):
+    components = value.split('_')
+    return components[0].title() + ''.join(x.title() for x in components[1:])
 
 
 def read_lab_data(data_name) -> pd.DataFrame:
@@ -134,7 +162,7 @@ def get_best_betas():
     return betas
 
 
-class ProposedDataProcessor:
+class ERUCBDataProcessor:
 
     def __init__(self, root, betas=None, ground_truth_model=None):
         self.root = root
@@ -180,16 +208,149 @@ class ProposedDataProcessor:
         return res
 
 
+class ProposedMethodDataProcessor:
+
+    def __init__(self, root):
+        self.root = root
+
+    def process(self, prefix):
+        df_results = []
+        for root, dirs, files in os.walk(self.root):
+            dir_name = os.path.basename(root)
+            if dir_name[:dir_name.rfind('-')] == prefix:
+                df_results.append(self._process_total_statistics(root, files))
+
+        # aggregate results
+        return pd.concat(df_results, ignore_index=True).sort_values('data set').reset_index(drop=True)
+
+    @staticmethod
+    def _process_total_statistics(root, files: list):
+        # find the total statistics file
+        df_details = {}
+        df_total = None
+        for file in files:
+            file_path = os.path.join(root, file)
+            if 'total' in file:
+                df_total = pd.read_csv(file_path, index_col=0)
+            elif file.endswith('csv') and 'process' not in file:
+                data_set_name = file[file.rindex('_') + 1: file.rindex('.')]
+                if not data_set_name:
+                    raise ValueError('Dataset name is not found')
+
+                df_details[data_set_name] = pd.read_csv(file_path, index_col=0)
+
+        if df_total is None:
+            raise ValueError('Total statistics file not exists')
+
+        # assign budget information to df_total
+        for index, row in df_total.iterrows():
+            detail = df_details[row['data set']]
+            budget = detail.loc[detail['name'] == row['best_model']]['budget'].values[0]
+            df_total.at[index, 'best_model'] = '{}: {}'.format(row['best_model'], budget)
+
+        return df_total
+
+
+class AutoSkParser:
+
+    def __init__(self, root):
+        self.root = root
+        self.data_name_prefix = 'Start fitting on '
+        self.test_v_prefix = 'Test v is '
+        self.best_v_prefix = 'Best validation score: '
+        self.model_info_prefix = 'SimpleClassificationPipeline('
+        self.model_name_key = 'classifier:__choice__'
+
+        self.validation_kf = StratifiedKFold(n_splits=5, shuffle=False)
+
+    def process(self, prefix):
+        results = []
+        for root, dirs, files in os.walk(self.root):
+            for file in files:
+                if file.startswith(prefix) and file.endswith('.log'):
+                    file_path = os.path.join(root, file)
+                    results.append(self._process_log_file(file_path))
+
+        result = pd.concat(results).sort_values('data set').reset_index(drop=True)
+        result['test_v'] = result['test_v'].astype(float)
+        result['best_v'] = result['best_v'].astype(float)
+
+        return result
+
+    def _process_log_file(self, file_path):
+        result = []
+        with open(file_path, mode='r') as f:
+            start_search = False
+            curr = {}
+            for line in f.readlines():
+                if line.strip('\n').endswith('============'):
+                    if start_search:
+                        result.append(curr)
+                        curr = {}
+                    start_search = not start_search
+
+                if start_search:
+                    if self.data_name_prefix in line:
+                        curr['data set'] = line.split(self.data_name_prefix)[1].strip('\n')
+                    elif self.test_v_prefix in line:
+                        curr['test_v'] = line.split(self.test_v_prefix)[1].strip('\n')
+                    elif self.best_v_prefix in line:
+                        curr['origin_best_v'] = line.split(self.best_v_prefix)[1].strip('\n')
+                    elif self.model_info_prefix in line:
+                        start = line.find(self.model_info_prefix)
+                        start += len(self.model_info_prefix)
+
+                        model_info = ast.literal_eval(line.strip('\n')[start: -1])
+                        curr['best_model'] = underscore_to_camelcase(model_info[self.model_name_key])
+                        curr['best_v'] = self._eval_best_v(model_info, curr['data set'])
+
+        columns = ['data set', 'best_v', 'origin_best_v', 'best_model', 'test_v']
+        return pd.DataFrame(data=result, columns=columns)
+
+    def _eval_best_v(self, model_info: dict, data_name: str):
+        model_name = underscore_to_camelcase(model_info[self.model_name_key])
+        model_generator = models[model_name.lower()]
+        param_prefix = 'classifier:{}:'.format(model_name)
+        actual_params = []
+        for key in model_info:
+            if param_prefix in key:
+                param = key.split(':')[2]
+                if model_name == 'AdaBoost'.lower() and param == 'max_depth':
+                    actual_params.append(('base_estimator', DecisionTreeClassifier(max_depth=model_info[key])))
+                else:
+                    actual_params.append((param, model_info[key]))
+
+        model = model_generator.generate_model(None, actual_params=actual_params)
+        print(model)
+
+        data = DataSet(data_name)
+        train_x, train_y = data.train_data()
+
+        eval_values = []
+        for train_index, valid_index in self.validation_kf.split(train_x, train_y):
+            x, y = data_collector(train_index, train_x, train_y)
+            valid_x, valid_y = data_collector(valid_index, train_x, train_y)
+
+            try:
+                model = model.fit(x, y)
+            except ValueError as e:  # temporally just catch ValueError
+                print("Parameter wrong, return 0, error message: {}".format(e))
+                return 0
+
+            predictions = model.predict(valid_x)
+
+            eval_value = accuracy_score(valid_y, predictions)
+            eval_values.append(eval_value)
+
+        return np.mean(np.array(eval_values))
+
+
 if __name__ == '__main__':
-    # process_data()
-    p = ProposedDataProcessor('/Users/jundaliao/Desktop/AutoML Log/proposed-new')
-    proposed_results = ['proposed-new4', 'proposed-new5', 'proposed-new6']
-    r = p.process_result(proposed_results)
-    a = p.aggregate_result(proposed_results)
-    assert isinstance(a, pd.DataFrame)
-    a.to_csv('log/final_result_aggregation.csv')
-    for rf in r:
-        rf.to_csv('log/final_result.csv', mode='a')
-    # a = get_best_betas()
-    # for d in a:
-    #     print('(DataSet(\'{}\'), {}),'.format(d, a[d]))
+    w_dir = '/Users/jundaliao/Desktop/AutoML Log/New/0515/autosk0515'
+    processor = AutoSkParser(w_dir)
+    a = processor.process('autosk')
+    a.to_csv('{}/final-autosk.csv'.format(w_dir))
+    prefix_list = ['eg', 'ucb', 'sf', 'proposed-new', 'erucb']
+    # for p in prefix_list:
+    #     a = processor.process(p)
+    #     a.to_csv('{}/final-{}.csv'.format(w_dir, p))

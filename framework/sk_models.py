@@ -15,8 +15,15 @@ class SKLearnModelGenerator(ModelGenerator):
     def __init__(self, hp_space, model_initializer):
         super().__init__(hp_space, model_initializer)
 
-    def generate_model(self, param_values):
+    def generate_model(self, param_values, actual_params=None):
         model = self._model_initializer()
+
+        if actual_params is not None:
+            for (param, value) in actual_params:
+                assert hasattr(model, param), 'model is {}, invalid param is {}'.format(model, param)
+                setattr(model, param, value)
+            return model
+
         assert len(param_values) == len(self.hp_space)
         # Check and set each parameters for the new model
         for value, param in zip(param_values, self.hp_space):
