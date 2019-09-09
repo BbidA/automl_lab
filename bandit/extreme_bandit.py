@@ -187,7 +187,7 @@ def run_model_selection():
 
 
 def run_extreme_bandit(data):
-    log = get_logger('extreme bandit', 'log/exb.log', level=DEBUG)
+    log = get_logger('extreme bandit', 'log/exb/exb.log', level=DEBUG)
 
     optimizations = _get_optimizations()
     model_selection = ExtremeHunter(optimizations)

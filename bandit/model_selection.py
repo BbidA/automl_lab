@@ -282,3 +282,13 @@ class SoftMaxSelection(ModelSelection):
                 return self.optimizations[i - 1]
 
         assert False
+
+
+class SingleArm(ModelSelection):
+
+    def fit(self, train_x, train_y, budget=200):
+        model = self.optimizations[0]
+        for i in range(budget):
+            self._logger.debug(f'Process: {i + 1}/{budget}')
+            model.run_one_step(train_x, train_y)
+        return model.instances

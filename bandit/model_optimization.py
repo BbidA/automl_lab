@@ -53,6 +53,14 @@ def inverse_sigmoid(y):
     return np.log(y / (1 - y))
 
 
+def cubic(x):
+    return 1 - x ** (- 1 / 3)
+
+
+def inverse_cubic(y):
+    return (1 / (1 - y)) ** 3
+
+
 class RacosOptimization(Optimization):
 
     def __init__(self, model_generator, name=None, b1=1, b2=1, alpha=1.0 / 4,
@@ -102,6 +110,7 @@ class RacosOptimization(Optimization):
         elapsed = time.time() - start
 
         self.inverse_eval.append(self.inverse_func_g(eval_result))
+        print('inv: {}, normal: {}'.format(self.inverse_eval[-1], eval_result))
         # calculate mu for methods like ucb, epsilon-greedy, and softmax
         self.mu = (self.mu * self.count + eval_result) / (self.count + 1)
 
@@ -216,6 +225,7 @@ class RacosOptimization(Optimization):
         item2_1 = abs((_func_a(n) / n) - x_hat * (seq_i - x_hat)) ** 3
         item2_2 = abs(np.asarray(self.inverse_eval) - (seq_i * self.beta1 + self.beta0)) ** 3
         item2 = item2_1 * item2_2
+        print('item2_1: {}, item2_2: {}, item_2'.format(item2_1, item2_2), item2)
         return item1 * item2.sum()
 
     def _x_hat(self):

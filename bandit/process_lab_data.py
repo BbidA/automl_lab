@@ -208,6 +208,44 @@ class ERUCBDataProcessor:
         return res
 
 
+class SingleArmProcessor:
+
+    def __init__(self, w_dir):
+        self.w_dir = w_dir
+
+    def process(self, prefix):
+        for root, dirs, files in os.walk(self.w_dir):
+            dir_name = os.path.basename(root)
+            if dir_name.startswith(prefix):
+                md_dict = {}
+                for file in files:
+                    if '.log' not in file:
+                        data = file[file.find('_') + 1: file.rfind('_')]
+                        model = file[file.rfind('_') + 1: file.rfind('.csv')]
+                        df = pd.read_csv(os.path.join(root, file))
+                        self._draw_diagram(df, data, model)
+                        if data not in md_dict:
+                            md_dict[data] = [model]
+                        else:
+                            md_dict[data].append(model)
+
+                for d in md_dict:
+                    for m in md_dict[d]:
+                        print(f'### {d} {m}')
+                        print('![](img/single/single_{}_{}.svg)'.format(d, m))
+                return
+
+    @staticmethod
+    def _draw_diagram(df: pd.DataFrame, data, model):
+        t = df.index.values + 1
+        pylab.title('Single Arm Test')
+        pylab.xlabel('t')
+        pylab.ylabel('accuracy')
+        pylab.plot(t, df['Accuracy'])
+        pylab.savefig('log/proposed/single_{}_{}.svg'.format(data, model))
+        pylab.show()
+
+
 class ProposedMethodDataProcessor:
 
     def __init__(self, root):
@@ -243,12 +281,50 @@ class ProposedMethodDataProcessor:
             raise ValueError('Total statistics file not exists')
 
         # assign budget information to df_total
+        exp_rate = []
         for index, row in df_total.iterrows():
             detail = df_details[row['data set']]
             budget = detail.loc[detail['name'] == row['best_model']]['budget'].values[0]
             df_total.at[index, 'best_model'] = '{}: {}'.format(row['best_model'], budget)
+            exp_rate.append(budget / 200)
+
+        df_total['exp_rate'] = exp_rate
 
         return df_total
+
+
+class FinalResultProcessor:
+
+    def __init__(self, root):
+        self.root = root
+
+    def process(self):
+        final_results = []
+        for root, dirs, files in os.walk(self.root):
+            for file in files:
+                if 'final-' in file:
+                    method_name = file[file.rfind('-') + 1: file.rfind('.csv')]
+                    final_results.append((method_name, pd.read_csv(os.path.join(root, file), index_col=0)))
+            break  # only search in depth 1
+
+        agg_results = []
+        for method, df in final_results:
+            cols = ['best_v', 'test_v', 'exp_rate']
+            if method == 'autosk':
+                cols.pop()
+                df.drop(['origin_best_v'], axis=1)
+
+            df[cols] = df[cols].applymap(lambda x: '{:.4f}'.format(x))
+            df_agg = df.groupby('data set').agg(lambda x: ' '.join(x))
+            df_agg['method'] = method
+
+            agg_results.append(df_agg)
+
+        return self._concat_results(agg_results)
+
+    @staticmethod
+    def _concat_results(agg_results):
+        return pd.concat(agg_results, sort=False).reset_index().set_index(['data set', 'method']).sort_index(0)
 
 
 class AutoSkParser:
@@ -321,7 +397,6 @@ class AutoSkParser:
                     actual_params.append((param, model_info[key]))
 
         model = model_generator.generate_model(None, actual_params=actual_params)
-        print(model)
 
         data = DataSet(data_name)
         train_x, train_y = data.train_data()
@@ -346,11 +421,18 @@ class AutoSkParser:
 
 
 if __name__ == '__main__':
-    w_dir = '/Users/jundaliao/Desktop/AutoML Log/New/0515/autosk0515'
-    processor = AutoSkParser(w_dir)
-    a = processor.process('autosk')
-    a.to_csv('{}/final-autosk.csv'.format(w_dir))
-    prefix_list = ['eg', 'ucb', 'sf', 'proposed-new', 'erucb']
-    # for p in prefix_list:
-    #     a = processor.process(p)
-    #     a.to_csv('{}/final-{}.csv'.format(w_dir, p))
+    working_dir = '/Users/jundaliao/Desktop/AutoML Log/New/0521'
+    processor = ProposedMethodDataProcessor(working_dir)
+    # au_pro = AutoSkParser(working_dir)
+    # au = au_pro.process('autosk')
+    # au.to_csv('{}/final-autosk.csv'.format(working_dir))
+    prefix_list = ['proposed-new', 'eg', 'sf', 'ucb', 'exh', 'erucb']
+    for p in prefix_list:
+        a = processor.process(p)
+        a.to_csv('{}/final-{}.csv'.format(working_dir, p))
+
+    final_pro = FinalResultProcessor(working_dir)
+    b = final_pro.process()
+    b.to_csv('{}/agg-result.csv'.format(working_dir), index_label=['data set', 'method'])
+    # processor = SingleArmProcessor(working_dir)
+    # processor.process('single')

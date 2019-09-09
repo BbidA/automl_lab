@@ -1,16 +1,17 @@
+import multiprocessing as mp
+import pickle
+import sys
 import time
+from logging import INFO, DEBUG
+
+import pandas as pd
 
 import framework.sk_models as sk
-from framework.param_search import random_search
 import utils.data_loader as data_loader
+from bandit.model_optimization import RacosOptimization
 from bandit.model_selection import BanditModelSelection, EpsilonGreedySelection, SoftMaxSelection, ERUCB
-from bandit.model_optimization import RandomOptimization, RacosOptimization
+from framework.param_search import random_search
 from utils.logging_ import get_logger
-import sys
-import multiprocessing as mp
-import pandas as pd
-import pickle
-from logging import INFO, DEBUG
 
 ALL_DATA = data_loader.all_data(
     exclude=['adult', 'banknote', 'credit', 'egg', 'flag', 'seismic', 'wpbc', 'yeast', 'magic04'])
@@ -68,6 +69,11 @@ def one_thread_lab(method):
         for data in ALL_DATA[start:end]:
             result.append(ground_truth_method(data))
         csv_file = 'log/ground/ground-total-statistics-{}to{}.csv'.format(start, end)
+    elif method == 'full':
+        for (data, _) in PROPOSED_DATA:
+            for model in model_generators:
+                single_arm_method(data, model)
+        return
     else:
         for (data, _) in PROPOSED_DATA:
             if method == 'ucb' or method == 'random':
@@ -105,6 +111,20 @@ def ground_truth_method(data):
     logger.info('Test v of {} is {}'.format(data.name, test_v))
 
     return data.name, df_result['best v'].max(), type(best_model).__name__, test_v
+
+
+def single_arm_method(data, model_gen, budget=BUDGET):
+    model_name = type(model_gen).__name__
+    optimization = RacosOptimization(model_gen, model_name)
+    train_x, train_y = data.train_data()
+    logger = get_logger('single_arm', 'log/single/single_arm.log')
+    logger.info(f'Begin to fit {data.name} using {model_name}')
+    for i in range(budget):
+        logger.info(f'Process: {i + 1}/{budget}')
+        optimization.run_one_step(train_x, train_y)
+    logger.info(f'Fitting on {data.name} using model {model_name} is over')
+
+    optimization.instances.to_csv(f'log/single/single_{data.name}_{model_name}.csv')
 
 
 def find_ground_truth(data, model_generator, budget=BUDGET):
